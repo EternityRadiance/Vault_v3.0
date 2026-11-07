@@ -1,0 +1,74 @@
+{% extends "admin/base.html" %}
+{% from "_macros.html" import render_badge %}
+
+{% block title %}{{ target.email }} — {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+        <h1 style="margin:0;">{{ target.email }}</h1>
+        <a href="/web/admin/users" class="btn btn--secondary">← К списку</a>
+    </div>
+
+    <table class="table" style="max-width:500px;">
+        <tr><td>ID</td><td>{{ target.id }}</td></tr>
+        <tr>
+            <td>Активен</td>
+            <td>{% if target.is_active %}{{ render_badge("да", "success") }}{% else %}{{ render_badge("нет", "danger") }}{% endif %}</td>
+        </tr>
+        <tr>
+            <td>Админ</td>
+            <td>{% if target.is_admin %}{{ render_badge("да", "success") }}{% else %}{{ render_badge("нет", "default") }}{% endif %}</td>
+        </tr>
+        <tr><td>Создан</td><td>{{ target.created_at | datetime_format }}</td></tr>
+    </table>
+
+    <div style="margin-top:1.5rem; display:flex; gap:0.5rem; flex-wrap:wrap;">
+        {% if target.is_active %}
+        <form method="post" action="/web/admin/users/{{ target.id }}/disable" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="btn btn--danger"
+                    onclick="return confirm('Заблокировать {{ target.email }}?')">Заблокировать</button>
+        </form>
+        {% else %}
+        <form method="post" action="/web/admin/users/{{ target.id }}/enable" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="btn btn--primary">Разблокировать</button>
+        </form>
+        {% endif %}
+
+        <form method="post" action="/web/admin/users/{{ target.id }}/revoke-sessions" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="btn btn--danger"
+                    onclick="return confirm('Завершить все сессии пользователя {{ target.email }}?')">Завершить все сессии</button>
+        </form>
+    </div>
+</div>
+
+<div class="card" style="margin-top:1rem;">
+    <h2>Аудит (последние 50)</h2>
+    {% if audit_events %}
+    <table class="table">
+        <thead>
+            <tr><th>Когда</th><th>Событие</th><th>IP</th><th>Metadata</th></tr>
+        </thead>
+        <tbody>
+            {% for e in audit_events %}
+            <tr>
+                <td>{{ e.created_at | datetime_format }}</td>
+                <td><code>{{ e.event_type }}</code></td>
+                <td>{{ e.ip or "—" }}</td>
+                <td>
+                    {% if e.metadata_json %}
+                        <pre style="margin:0; font-size:0.75rem; max-width:400px; overflow-x:auto;">{{ e.metadata_json | tojson }}</pre>
+                    {% else %}—{% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted">Нет событий.</p>
+    {% endif %}
+</div>
+{% endblock %}

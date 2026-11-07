@@ -22,3 +22,12 @@ class OAuthEvents:
     CLIENT_ENABLED = "client.enabled"
     CLIENT_DISABLED = "client.disabled"
     SESSION_REVOKED = "session.revoked"
+
+class AdminEvents:
+    USER_DISABLED = "admin.user.disabled"
+    USER_ENABLED = "admin.user.enabled"
+    USER_SESSIONS_REVOKED = "admin.user.sessions_revoked"
+    CLIENT_ENABLED = "admin.client.enabled"
+    CLIENT_DISABLED = "admin.client.disabled"
+    CLIENT_SECRET_ROTATED = "admin.client.secret_rotated"
+    CLIENT_CREATED = "admin.client.created"

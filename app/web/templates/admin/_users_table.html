@@ -1,0 +1,27 @@
+{% if users %}
+<table class="table">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Email</th>
+            <th>Админ</th>
+            <th>Активен</th>
+            <th>Создан</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for u in users %}
+        <tr style="cursor:pointer;" onclick="window.location='/web/admin/users/{{ u.id }}'">
+            <td>{{ u.id }}</td>
+            <td>{{ u.email }}</td>
+            <td>{% if u.is_admin %}<span class="badge badge--success">да</span>{% else %}<span class="badge badge--default">нет</span>{% endif %}</td>
+            <td>{% if u.is_active %}<span class="badge badge--success">да</span>{% else %}<span class="badge badge--danger">нет</span>{% endif %}</td>
+            <td>{{ u.created_at | datetime_format }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+<p class="text-muted">Всего: {{ total }}.</p>
+{% else %}
+<p class="text-muted">Пользователи не найдены.</p>
+{% endif %}

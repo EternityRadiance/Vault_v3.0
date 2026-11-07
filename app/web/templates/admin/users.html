@@ -1,0 +1,56 @@
+{% extends "admin/base.html" %}
+{% from "_macros.html" import render_pagination %}
+
+{% block title %}Пользователи — {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; margin-bottom:1rem;">
+        <h1 style="margin:0;">Пользователи</h1>
+        <a href="/web/admin" class="btn btn--secondary">← Дашборд</a>
+    </div>
+
+    <form method="get" action="/web/admin/users"
+          style="display:flex; gap:0.5rem; align-items:center; margin-bottom:1rem;">
+        <input type="text" name="q" value="{{ q }}"
+               placeholder="Поиск по email..."
+               style="flex:1; padding:0.5rem; border:1px solid var(--border); border-radius:4px;"
+               autocomplete="off" id="user-search">
+        <button type="submit" class="btn btn--primary">Найти</button>
+        {% if q %}
+            <a href="/web/admin/users" class="btn btn--secondary">Сбросить</a>
+        {% endif %}
+    </form>
+
+    <div id="users-table-container">
+        {% include "admin/_users_table.html" %}
+    </div>
+
+    {{ render_pagination(page, total_pages, "/web/admin/users", "&q=" ~ (q|urlencode) if q else "") }}
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+(function () {
+    const input = document.getElementById('user-search');
+    if (!input) return;
+    const container = document.getElementById('users-table-container');
+    let t = null;
+
+    input.addEventListener('input', function () {
+        clearTimeout(t);
+        t = setTimeout(async function () {
+            const q = encodeURIComponent(input.value.trim());
+            try {
+                const r = await fetch(`/web/admin/users?q=${q}&partial=1`, {
+                    credentials: 'same-origin',
+                });
+                if (r.ok) container.innerHTML = await r.text();
+            } catch (e) { /* ignore */ }
+        }, 300);
+    });
+})();
+</script>
+{% endblock %}
