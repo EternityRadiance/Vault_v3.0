@@ -70,6 +70,9 @@ def handle_authorization_code_grant(
         oauth_json_error(INVALID_GRANT, "Code has expired")
 
     if auth_code.client_id != client.client_id:
+        oauth_json_error(INVALID_GRANT, "client_id mismatch")
+
+    if auth_code.redirect_uri != redirect_uri:
         oauth_json_error(INVALID_GRANT, "redirect_uri mismatch")
 
     if auth_code.code_challenge:
