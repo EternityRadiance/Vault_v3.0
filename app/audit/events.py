@@ -2,7 +2,9 @@ class UserEvents:
     CREATED = "user.created"
     LOGIN_SUCCESS = "user.login.success"
     LOGIN_FAILURE = "user.login.failure"
+    LOGOUT = "user.logout"
     DISABLED = "user.disabled"
+    PASSWORD_CHANGED = "password.changed"
 
 class ClientEvents:
     CREATED = "client.created"

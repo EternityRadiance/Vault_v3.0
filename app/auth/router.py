@@ -1,6 +1,5 @@
 from __future__ import annotations
-import secrets
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.auth.schemas import Credentials, MeResponse, TokenResponse
@@ -17,10 +16,6 @@ from app.models.user import User
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-def _set_session_cookies(response: Response, token: str) -> None:
-    csrf = secrets.token_urlsafe(32)
-    response.set_cookie("vault_session", token, httponly=True, samesite="lax", max_age=3600)
-    response.set_cookie("vault_csrf", csrf, httponly=False, samesite="lax", max_age=3600)
 
 @router.post(
     "/register",
@@ -30,10 +25,8 @@ def _set_session_cookies(response: Response, token: str) -> None:
 def register(
     body: Credentials,
     request: Request,
-    response: Response,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-
     try:
         user, token = register_user(
             db,
@@ -52,18 +45,15 @@ def register(
             detail=str(e),
         )
 
-    _set_session_cookies(response, token)
-
     return TokenResponse(access_token=token)
+
 
 @router.post("/login", response_model=TokenResponse)
 def login(
     body: Credentials,
     request: Request,
-    response: Response,
     db: Session = Depends(get_db),
 ):
-
     try:
         user, token = authenticate_user(
             db,
@@ -78,22 +68,18 @@ def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    _set_session_cookies(response, token)
-
     return TokenResponse(access_token=token)
+
 
 @router.get("/me", response_model=MeResponse)
 def me(current_user: User = Depends(get_current_user)):
-
-
     return MeResponse(
         id=current_user.id,
         email=current_user.email,
         is_admin=current_user.is_admin,
     )
 
+
 @router.post("/logout", include_in_schema=False)
-def logout(response: Response):
-    response.delete_cookie("vault_session")
-    response.delete_cookie("vault_csrf")
+def logout():
     return {"status": "ok"}

@@ -2,6 +2,8 @@ from __future__ import annotations
 from pathlib import Path
 from ariadne import load_schema_from_path, make_executable_schema, snake_case_fallback_resolvers
 from ariadne.asgi import GraphQL
+from ariadne.asgi.handlers import GraphQLHTTPHandler
+from ariadne.types import Extension
 
 from app.graphql.context import get_context_value
 from app.graphql.directives import IsAdminDirective, IsAuthenticatedDirective
@@ -23,8 +25,28 @@ schema = make_executable_schema(
     },
 )
 
+
+class CloseDbExtension(Extension):
+
+    def request_finished(self, context):
+        if not isinstance(context, dict):
+            return
+        db = context.get("db")
+        if db is None:
+            return
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        try:
+            db.close()
+        except Exception:
+            pass
+
+
 graphql_app = GraphQL(
     schema,
     context_value=get_context_value,
-    debug=True,
+    http_handler=GraphQLHTTPHandler(extensions=[CloseDbExtension]),
+    debug=False,
 )

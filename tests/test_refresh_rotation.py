@@ -25,9 +25,7 @@ class TestRefreshRotation:
                 "scope": "openid email",
             },
         )
-
-        if resp.status_code != 200:
-            return
+        assert resp.status_code == 200, f"password grant failed: {resp.text}"
 
         rt1 = resp.json()["refresh_token"]
 

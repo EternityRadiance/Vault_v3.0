@@ -14,16 +14,16 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 
 def _extract_bearer_token(request: Request) -> str | None:
+    """
+    Достаёт Bearer-токен только из заголовка Authorization.
+    Cookie vault_session — это SSR-сессия (SessionMiddleware),
+    к JWT-аутентификации отношения не имеет.
+    """
     auth = request.headers.get("Authorization")
     if auth:
         parts = auth.split(maxsplit=1)
         if len(parts) == 2 and parts[0].lower() == "bearer":
             return parts[1].strip() or None
-
-    cookie = request.cookies.get("vault_session")
-    if cookie:
-        return cookie.strip() or None
-
     return None
 
 

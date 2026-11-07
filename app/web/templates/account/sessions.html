@@ -22,7 +22,7 @@
             {% for s in sessions %}
             <tr>
                 <td>{{ s.ip or "—" }}</td>
-                <td>{{ s.user_agent or "—" }}</td>
+                <td>{{ s.user_agent | ua_humanize }}</td>
                 <td>{{ s.created_at | datetime_format }}</td>
                 <td>{{ s.last_seen_at | humanize }}</td>
                 <td>

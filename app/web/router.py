@@ -5,6 +5,8 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
+from app.audit.events import OAuthEvents, UserEvents
+from app.audit.service import get_client_info, write_event
 from app.auth.service import (
     EmailAlreadyExistsError,
     register_user,
@@ -24,12 +26,18 @@ from app.web.session import create_web_session, destroy_web_session, get_web_use
 
 router = APIRouter(prefix="/web", tags=["web"])
 
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
 @router.get("/")
 def index(request: Request, db: Session = Depends(get_db)):
     user = get_web_user(db, request)
     if user is None:
         return RedirectResponse("/web/login", status_code=303)
     return RedirectResponse("/web/account", status_code=303)
+
 
 @router.get("/login")
 def login_page(request: Request, next: str | None = None):
@@ -38,6 +46,7 @@ def login_page(request: Request, next: str | None = None):
         "auth/login.html",
         next=next or "",
     )
+
 
 @router.post("/login")
 async def login_submit(
@@ -58,7 +67,7 @@ async def login_submit(
             request,
             "auth/login.html",
             errors=errors,
-            form_date=data,
+            form_data=data,
             next=form_data.get("next", ""),
         )
 
@@ -87,9 +96,11 @@ async def login_submit(
 
     return RedirectResponse(next_url, status_code=303)
 
+
 @router.get("/register")
 def register_page(request: Request):
     return render(request, "auth/register.html")
+
 
 @router.post("/register")
 async def register_submit(
@@ -124,7 +135,7 @@ async def register_submit(
             email=form.email,
             password=form.password,
             request=request,
-        ) 
+        )
     except EmailAlreadyExistsError:
         return render(
             request,
@@ -144,6 +155,7 @@ async def register_submit(
     flash(request, "Регистрация успешна!", "success")
     return RedirectResponse("/web/account", status_code=303)
 
+
 @router.post("/logout")
 async def logout_submit(
     request: Request,
@@ -152,9 +164,22 @@ async def logout_submit(
     form_data = await request.form()
     verify_csrf(request, form_data.get("csrf_token"))
 
+    user = get_web_user(db, request)
     destroy_web_session(db, request)
+
+    if user is not None:
+        info = get_client_info(request)
+        write_event(
+            db,
+            UserEvents.LOGOUT,
+            actor_id=user.id,
+            ip=info["ip"],
+            user_agent=info["user_agent"],
+        )
+
     flash(request, "Вы вышли из аккаунта", "info")
     return RedirectResponse("/web/login", status_code=303)
+
 
 @router.get("/account")
 def account_page(
@@ -163,6 +188,7 @@ def account_page(
     user: User = Depends(require_web_user),
 ):
     return render(request, "account/profile.html", current_user=user)
+
 
 @router.get("/account/sessions")
 def account_sessions_page(
@@ -186,6 +212,7 @@ def account_sessions_page(
         current_session_id=current_session_id,
     )
 
+
 @router.post("/account/sessions/{session_id}/revoke")
 async def account_session_revoke(
     request: Request,
@@ -204,11 +231,22 @@ async def account_session_revoke(
     ).scalar_one_or_none()
 
     if ws is not None and ws.revoked_at is None:
-        ws.revoked_at = datetime.now(timezone.utc)
+        ws.revoked_at = _utcnow()
         db.commit()
+
+        info = get_client_info(request)
+        write_event(
+            db,
+            OAuthEvents.SESSION_REVOKED,
+            actor_id=user.id,
+            ip=info["ip"],
+            user_agent=info["user_agent"],
+            metadata={"web_session_id": session_id},
+        )
         flash(request, "Сессия завершена", "success")
 
     return RedirectResponse("/web/account/sessions", status_code=303)
+
 
 @router.get("/account/security")
 def account_security_page(
@@ -221,6 +259,7 @@ def account_security_page(
         "account/security.html",
         current_user=user,
     )
+
 
 @router.post("/account/security")
 async def account_security_submit(
@@ -261,16 +300,25 @@ async def account_security_submit(
     db.commit()
 
     current_session_id = request.session.get("session_id")
-    db.execute(
+    revoked = db.execute(
         update(WebSession).where(
             WebSession.user_id == user.id,
             WebSession.session_id != current_session_id,
             WebSession.revoked_at.is_(None),
         )
-        .values(revoked_at=datetime.now(timezone.utc).replace(tzinfo=None))
-    )
+        .values(revoked_at=_utcnow())
+    ).rowcount
     db.commit()
+
+    info = get_client_info(request)
+    write_event(
+        db,
+        UserEvents.PASSWORD_CHANGED,
+        actor_id=user.id,
+        ip=info["ip"],
+        user_agent=info["user_agent"],
+        metadata={"sessions_revoked": revoked},
+    )
 
     flash(request, "Пароль изменен. Остальные устройства разлогинены.", "success")
     return RedirectResponse("/web/account/security", status_code=303)
-
