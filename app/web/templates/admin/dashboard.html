@@ -1,0 +1,34 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Админка — {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1>Админ-консоль</h1>
+    <p class="text-muted">Обзор Vault. Счётчики обновляются каждые 30 секунд.</p>
+</div>
+
+<div id="stats-container"
+     style="display:grid; grid-template-columns:repeat(4, 1fr); gap:1rem;">
+    {% include "admin/_stats.html" %}
+</div>
+
+<div class="card" style="margin-top:1rem;">
+    <h2>Логины за 7 дней</h2>
+    <p class="text-muted">
+        Всего за период: <strong>{{ sparkline_meta.total }}</strong>.
+        Первый день: {{ sparkline_meta.first_date }}, последний: {{ sparkline_meta.last_date }}.
+    </p>
+    <svg viewBox="0 0 200 50" width="100%" height="80"
+         style="border:1px solid var(--border); border-radius:4px; background:var(--bg);"
+         preserveAspectRatio="none">
+        <polyline points="{{ sparkline_points }}"
+                  fill="none"
+                  stroke="var(--primary)"
+                  stroke-width="1.5"/>
+    </svg>
+    <p class="text-muted" style="margin-top:0.5rem;">
+        Максимум за день: {{ sparkline_meta.max_day_value }}.
+    </p>
+</div>
+{% endblock %}

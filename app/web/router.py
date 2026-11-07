@@ -24,6 +24,8 @@ from app.web.flash import flash
 from app.web.forms import LoginForm, RegisterForm, parse_form
 from app.web.session import create_web_session, destroy_web_session, get_web_user
 
+from app.web.admin_router import router as admin_router
+
 router = APIRouter(prefix="/web", tags=["web"])
 
 
@@ -322,3 +324,5 @@ async def account_security_submit(
 
     flash(request, "Пароль изменен. Остальные устройства разлогинены.", "success")
     return RedirectResponse("/web/account/security", status_code=303)
+
+router.include_router(admin_router)
