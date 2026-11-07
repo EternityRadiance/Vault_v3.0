@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% from "_macros.html" import render_field, render_button %}
+
+{% block title %}Вход — {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 400px; margin: 2rem auto;">
+    <h1>Вход</h1>
+
+    <form method="post" action="/web/login">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="next" value="{{ next or '' }}">
+
+        {{ render_field("email", "Email", value=form_data.email if form_data else "", errors=errors.get("email") if errors else None, type="email", autocomplete="username", required=True) }}
+        {{ render_field("password", "Пароль", errors=errors.get("password") if errors else None, type="password", autocomplete="current-password", required=True) }}
+
+        {{ render_button("Войти", "primary", "submit") }}
+    </form>
+
+    <p style="margin-top: 1rem; text-align: center;">
+        Нет аккаунта? <a href="/web/register">Зарегистрироваться</a>
+    </p>
+</div>
+{% endblock %}

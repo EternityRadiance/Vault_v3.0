@@ -33,4 +33,8 @@ class Settings(BaseSettings):
     auth_code_ttl_sec: int = 60
     pkce_required_for_public: bool = True
 
+    session_secret: str = Field(..., min_length=32)
+    session_cookie_name: str = "vault_session"
+    session_ttl_min: int = 30
+
 settings = Settings()

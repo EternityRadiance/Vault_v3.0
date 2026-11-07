@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="{{ theme }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ app_name }}{% endblock %}</title>
+    <link rel="stylesheet" href="/web/static/css/app.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔒</text></svg>">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container header-inner">
+            <a href="/web/" class="logo">{{ app_name }}</a>
+
+            <nav class="nav">
+                {% if current_user %}
+                    <a href="/web/account">Аккаунт</a>
+                    {% if current_user.is_admin %}
+                        <a href="/web/admin">Админка</a>
+                    {% endif %}
+                    <form method="post" action="/web/logout" class="inline-form">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <button type="submit" class="btn-link">Выйти</button>
+                    </form>
+                {% else %}
+                    <a href="/web/login">Войти</a>
+                    <a href="/web/register">Регистрация</a>
+                {% endif %}
+            </nav>
+        </div>
+    </header>
+
+    {% if flash_messages %}
+        <div class="container flash-container">
+            {% from "_macros.html" import render_flash %}
+            {{ render_flash(flash_messages) }}
+        </div>
+    {% endif %}
+
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p>{{ app_name }} v{{ version }}</p>
+        </div>
+    </footer>
+
+    <script src="/web/static/js/app.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

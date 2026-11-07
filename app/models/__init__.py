@@ -4,6 +4,7 @@ from app.models.oauth_client import OAuthClient
 from app.models.refresh_token import RefreshToken
 from app.models.user import User
 from app.models.user_session import UserSession
+from app.models.web_session import WebSession
 
 __all__ = [
     "User",
@@ -12,4 +13,5 @@ __all__ = [
     "RefreshToken",
     "AuthCode",
     "UserSession",
+    "WebSession",
 ]
