@@ -1,7 +1,8 @@
 from __future__ import annotations
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, Form, Request, status
 from fastapi.responses import RedirectResponse
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.auth.service import (
@@ -10,11 +11,13 @@ from app.auth.service import (
     authenticate_user,
     InvalidCredentialsError,
 )
-from app.core.passwords import WeakPasswordError, verify_password
+from app.core.passwords import WeakPasswordError, verify_password, hash_password, validate_policy
 from app.db.session import get_db
+from app.models.web_session import WebSession
 from app.models.user import User
 from app.web.context import render
 from app.web.csrf import verify_csrf
+from app.web.deps import require_web_user
 from app.web.flash import flash
 from app.web.forms import LoginForm, RegisterForm, parse_form
 from app.web.session import create_web_session, destroy_web_session, get_web_user
@@ -48,7 +51,7 @@ async def login_submit(
         "email": form_data.get("email", "").strip(),
         "password": form_data.get("password", ""),
     }
-    form, errors = parse_form(LoginForm. data)
+    form, errors = parse_form(LoginForm, data)
 
     if errors:
         return render(
@@ -152,3 +155,122 @@ async def logout_submit(
     destroy_web_session(db, request)
     flash(request, "Вы вышли из аккаунта", "info")
     return RedirectResponse("/web/login", status_code=303)
+
+@router.get("/account")
+def account_page(
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_web_user),
+):
+    return render(request, "account/profile.html", current_user=user)
+
+@router.get("/account/sessions")
+def account_sessions_page(
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_web_user),
+):
+    sessions = db.execute(
+        select(WebSession)
+        .where(WebSession.user_id == user.id)
+        .order_by(WebSession.last_seen_at.desc())
+    ).scalars().all()
+
+    current_session_id = request.session.get("session_id")
+
+    return render(
+        request,
+        "account/sessions.html",
+        current_user=user,
+        sessions=sessions,
+        current_session_id=current_session_id,
+    )
+
+@router.post("/account/sessions/{session_id}/revoke")
+async def account_session_revoke(
+    request: Request,
+    session_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_web_user),
+):
+    form_data = await request.form()
+    verify_csrf(request, form_data.get("csrf_token"))
+
+    ws = db.execute(
+        select(WebSession).where(
+            WebSession.session_id == session_id,
+            WebSession.user_id == user.id,
+        )
+    ).scalar_one_or_none()
+
+    if ws is not None and ws.revoked_at is None:
+        ws.revoked_at = datetime.now(timezone.utc)
+        db.commit()
+        flash(request, "Сессия завершена", "success")
+
+    return RedirectResponse("/web/account/sessions", status_code=303)
+
+@router.get("/account/security")
+def account_security_page(
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_web_user),
+):
+    return render(
+        request,
+        "account/security.html",
+        current_user=user,
+    )
+
+@router.post("/account/security")
+async def account_security_submit(
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_web_user),
+):
+    form_data = await request.form()
+    verify_csrf(request, form_data.get("csrf_token"))
+
+    old_password = form_data.get("old_password", "")
+    new_password = form_data.get("new_password", "")
+    new_password_confirm = form_data.get("new_password_confirm", "")
+
+    errors = {}
+
+    if not verify_password(old_password, user.hashed_password):
+        errors["old_password"] = ["Неверный текущий пароль"]
+
+    if new_password != new_password_confirm:
+        errors["new_password_confirm"] = ["Пароли не совпадают"]
+
+    if not errors:
+        try:
+            validate_policy(new_password, user_inputs=[user.email])
+        except WeakPasswordError as e:
+            errors["new_password"] = [str(e)]
+
+    if errors:
+        return render(
+            request,
+            "account/security.html",
+            current_user=user,
+            errors=errors,
+        )
+
+    user.hashed_password = hash_password(new_password)
+    db.commit()
+
+    current_session_id = request.session.get("session_id")
+    db.execute(
+        update(WebSession).where(
+            WebSession.user_id == user.id,
+            WebSession.session_id != current_session_id,
+            WebSession.revoked_at.is_(None),
+        )
+        .values(revoked_at=datetime.now(timezone.utc).replace(tzinfo=None))
+    )
+    db.commit()
+
+    flash(request, "Пароль изменен. Остальные устройства разлогинены.", "success")
+    return RedirectResponse("/web/account/security", status_code=303)
+

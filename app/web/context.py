@@ -1,6 +1,7 @@
 from __future__ import annotations
 from pathlib import Path
 from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse
 
 from app.config import settings
 from app.web.filters import register_filters
@@ -25,6 +26,5 @@ def render(request, template_name: str, **kwargs) -> "HTMLResponse":
         "flash_messages": pop_flashed_messages(request),
         **kwargs,
     }
-
-    from fastapi.responses import HTMLResponse
+    
     return templates.TemplateResponse(template_name, {"request": request, **context})

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% from "_macros.html" import render_badge %}
+
+{% block title %}Аккаунт — {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1>Мой профиль</h1>
+
+    <table class="table" style="max-width: 500px;">
+        <tr>
+            <td>Email</td>
+            <td><strong>{{ current_user.email }}</strong></td>
+        </tr>
+        <tr>
+            <td>ID</td>
+            <td>{{ current_user.id }}</td>
+        </tr>
+        <tr>
+            <td>Админ</td>
+            <td>
+                {% if current_user.is_admin %}
+                    {{ render_badge("да", "success") }}
+                {% else %}
+                    {{ render_badge("нет", "default") }}
+                {% endif %}
+            </td>
+        </tr>
+        <tr>
+            <td>Зарегистрирован</td>
+            <td>{{ current_user.created_at | datetime_format }}</td>
+        </tr>
+    </table>
+
+    <div style="margin-top: 1.5rem;">
+        <a href="/web/account/sessions" class="btn btn--secondary">Сессии</a>
+        <a href="/web/account/security" class="btn btn--secondary">Безопасность</a>
+    </div>
+</div>
+{% endblock %}

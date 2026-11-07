@@ -80,7 +80,7 @@ def get_web_user(
         request.session.pop("session_id", None)
         return None
 
-    return User
+    return user
 
 def destroy_web_session(db: Session, request: Request) -> None:
     session_id = request.session.get("session_id")

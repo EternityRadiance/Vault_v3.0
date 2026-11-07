@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% from "_macros.html" import render_field, render_button %}
+
+{% block title %}Безопасность — {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 500px;">
+    <h1>Смена пароля</h1>
+
+    <form method="post" action="/web/account/security">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        {{ render_field("old_password", "Текущий пароль", errors=errors.get("old_password") if errors else None, type="password", autocomplete="current-password", required=True) }}
+        {{ render_field("new_password", "Новый пароль (минимум 12 символов)", errors=errors.get("new_password") if errors else None, type="password", autocomplete="new-password", required=True) }}
+        {{ render_field("new_password_confirm", "Подтверждение нового пароля", errors=errors.get("new_password_confirm") if errors else None, type="password", autocomplete="new-password", required=True) }}
+
+        {{ render_button("Изменить пароль", "primary", "submit") }}
+    </form>
+
+    <p style="margin-top: 1rem;">
+        <a href="/web/account">← Назад в профиль</a>
+    </p>
+</div>
+{% endblock %}

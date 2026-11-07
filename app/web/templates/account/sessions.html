@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% from "_macros.html" import render_badge %}
+
+{% block title %}Сессии — {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1>Активные сессии</h1>
+
+    {% if sessions %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th>IP</th>
+                <th>Устройство</th>
+                <th>Создана</th>
+                <th>Последняя активность</th>
+                <th>Действия</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in sessions %}
+            <tr>
+                <td>{{ s.ip or "—" }}</td>
+                <td>{{ s.user_agent or "—" }}</td>
+                <td>{{ s.created_at | datetime_format }}</td>
+                <td>{{ s.last_seen_at | humanize }}</td>
+                <td>
+                    {% if s.session_id == current_session_id %}
+                        {{ render_badge("эта сессия", "success") }}
+                    {% elif s.revoked_at %}
+                        {{ render_badge("завершена", "default") }}
+                    {% else %}
+                        <form method="post" action="/web/account/sessions/{{ s.session_id }}/revoke" style="display: inline;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <button type="submit" class="btn btn--danger" onclick="return confirm('Завершить эту сессию?')">Завершить</button>
+                        </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+        <p>Нет активных сессий.</p>
+    {% endif %}
+
+    <p style="margin-top: 1rem;">
+        <a href="/web/account">← Назад в профиль</a>
+    </p>
+</div>
+{% endblock %}
