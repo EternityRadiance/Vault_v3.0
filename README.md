@@ -1,32 +1,46 @@
-# Vault — OAuth2/OIDC Provider
+# Vault — OAuth2/OIDC Provider + SSR Web UI
 
-Сервис управления пользователями и OAuth-клиентами. Реализует **OAuth2 (RFC 6749)** и **OpenID Connect** с поддержкой:
+Сервис управления пользователями и OAuth-клиентами с веб-интерфейсом на SSR (Jinja2).
+Реализует **OAuth2 (RFC 6749)** и **OpenID Connect** + полноценный сайт для пользователей
+и администраторов.
 
-- RS256-подписи JWT и публикацией **JWKS**.
-- Grant-типов `authorization_code` (с **PKCE S256**), `refresh_token` (с **rotation** и детекцией reuse), `password`, `client_credentials`.
-- OIDC: `id_token`, `/oauth/userinfo`, `/.well-known/openid-configuration`.
-- Отзыва токенов (`/oauth/revoke`, RFC 7009) и интроспекции (`/oauth/introspect`, RFC 7662) с Redis blacklist.
-- GraphQL API для админки: сессии, refresh-токены, ротация секретов клиентов.
+## Что внутри
+
+**OAuth2/OIDC**
+- RS256-подписи JWT, публикация **JWKS**, OIDC Discovery.
+- Grant-типы: `authorization_code` (PKCE S256), `refresh_token` (rotation + reuse detection),
+  `password` (deprecated), `client_credentials`.
+- Отзыв токенов (`/oauth/revoke`, RFC 7009), интроспекция (`/oauth/introspect`, RFC 7662).
+- Blacklist access-токенов в Redis (TTL = остаток жизни).
+
+**SSR Web UI**
+- Jinja2-шаблоны: базовый layout, макросы, фильтры, автоэкранирование.
+- Cookie-сессии (`WebSession` в БД + `SessionMiddleware`), **отдельные от OAuth-токенов**.
+- CSRF-защита на всех POST-формах (double-submit, `secrets.compare_digest`).
+- Личный кабинет: профиль, активные сессии, смена пароля.
+- Админ-консоль: дашборд, пользователи, OAuth-клиенты, аудит с фильтрами и CSV-экспортом.
+- Flash-сообщения, пагинация, live-поиск, тёмная тема (progressive enhancement).
+- Consent screen для OAuth (см. `/web/consent`, лаб. 4 п. 9).
 
 ## Стек
 
 - **FastAPI** — веб-фреймворк.
-- **Ariadne** — schema-first GraphQL.
-- **SQLAlchemy 2.x** — ORM.
-- **Alembic** — миграции.
+- **Ariadne** — schema-first GraphQL (для API-клиентов).
+- **SQLAlchemy 2.x**, **Alembic** — ORM и миграции.
 - **PostgreSQL** — БД (SQLite для тестов).
 - **Redis** — blacklist access-токенов.
-- **cryptography** — RSA-ключи, RS256.
-- **python-jose** — JWT.
-- **argon2-cffi** — хэширование паролей и `client_secret`.
+- **Jinja2** — SSR-шаблоны.
+- **itsdangerous** (через Starlette `SessionMiddleware`) — подпись cookie-сессий.
+- **python-jose**, **cryptography** — JWT (RS256).
+- **argon2-cffi** — Argon2id для паролей и `client_secret`.
 - **zxcvbn** — политика паролей.
-- **jinja2** — шаблоны demo-RP.
+- **user-agents** — парсинг User-Agent в списке сессий.
 
 ## Установка
 
 ```bash
 git clone <URL_репозитория>
-cd lab3_vault
+cd lab4_vault
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -79,12 +93,37 @@ python run.py
 ```
 
 ## Интерфейсы
-1) Swagger UI — http://127.0.0.1:8000/docs
-2) GraphQL Playground — http://127.0.0.1:8000/graphql/
-3) Админка — http://127.0.0.1:8000/admin/
-4) Аккаунт — http://127.0.0.1:8000/account/
-5) OIDC Discovery — http://127.0.0.1:8000/.well-known/openid-configuration
-6) JWKS — http://127.0.0.1:8000/.well-known/jwks.json
+1) Swagger UI - http://127.0.0.1:8000/docs
+2) GraphQL Playground - http://127.0.0.1:8000/graphql/
+3) Authorization endpoint (PKCE) - http://127.0.0.1:8000/oauth/authorize
+4) Token endpoint (4 grant-типа) - http://127.0.0.1:8000/oauth/token
+5) Отзыв токена - http://127.0.0.1:8000/oauth/revoke
+6) Интроспекция - http://127.0.0.1:8000/oauth/introspect
+7) OIDC Userinfo - http://127.0.0.1:8000/oauth/userinfo
+8) OIDC Discovery - http://127.0.0.1:8000/.well-known/openid-configuration
+9) JWKS - http://127.0.0.1:8000/.well-known/jwks.json
+
+## SSR-веб-интерфейс
+1) Вход(форма) - http://127.0.0.1:8000/web/login
+2) Регистрация - http://127.0.0.1:8000/web/register
+3) Личный кабинет(профиль) - http://127.0.0.1:8000/web/account
+4) Активные сессии - http://127.0.0.1:8000/web/account/sessions
+5) Смена пароля - http://127.0.0.1:8000/web/account/security
+6) Админ-консоль: дашборд - http://127.0.0.1:8000/web/admin
+7) Пользователи - http://127.0.0.1:8000/web/admin/users
+8) Карточка пользователя - http://127.0.0.1:8000/web/admin/users/{id}
+9) OAuth-клиенты - http://127.0.0.1:8000/web/admin/clients
+10) Создать клиента - http://127.0.0.1:8000/web/admin/clients/new
+11) Детали клиента - http://127.0.0.1:8000/web/admin/clients/{id}
+12) Аудит с фильтрами - http://127.0.0.1:8000/web/admin/audit
+13) Экспорт аудита в CSV - http://127.0.0.1:8000/web/admin/audit/export.csv
+14) OAuth consent screen - http://127.0.0.1:8000/web/consent
+
+## Назначение админа
+После регистрации через /web/register выдай себе админку:
+```bash
+python scripts/make_admin.py user@example.com
+```
 
 ## OAuth2/OIDC эндпоинты
 
@@ -105,28 +144,11 @@ python run.py
 - `password` (deprecated в OAuth 2.1, но оставлен для first-party приложений).
 - `client_credentials` (только для конфиденциальных клиентов).
 
-## Пример обмена code → token
-
-```bash
-curl -X POST http://127.0.0.1:8000/oauth/token \
-  -d "grant_type=authorization_code" \
-  -d "client_id=<client_id>" \
-  -d "code=<code>" \
-  -d "redirect_uri=http://127.0.0.1:8001/callback" \
-  -d "code_verifier=<verifier>"
-```
-
 ## demo-RP
 Демонстрационный OIDC-клиент (FastAPI + Jinja2).
 
 ```bash
 uvicorn demo_rp.main:app --port 8001
-```
-Ограничение: в браузере flow требует SSR-логин (WIP). Сейчас — проверяется через curl (см. USAGE.md).
-
-## Назначение админа
-```bash
-python scripts/make_admin.py user@example.com
 ```
 
 ## Тесты

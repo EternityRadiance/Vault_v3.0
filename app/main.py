@@ -48,6 +48,4 @@ def health():
     return {"status": "ok", "app": settings.app_name}
 
 app.mount("/graphql", graphql_app)
-app.mount("/admin", StaticFiles(directory="app/static", html=True), name="admin")
-app.mount("/account", StaticFiles(directory="app/static/account", html=True), name="account")
 app.mount("/web/static", StaticFiles(directory="app/web/static"), name="web_static")
