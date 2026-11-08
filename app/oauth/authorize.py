@@ -25,7 +25,6 @@ from app.web.session import get_web_user
 
 router = APIRouter(tags=["oauth"])
 
-CONSENT_TTL_SEC = 300
 CONSENT_KEY_PREFIX = "consent:"
 
 
@@ -152,7 +151,7 @@ def authorize(
     }
     get_redis().setex(
         f"{CONSENT_KEY_PREFIX}{pending_id}",
-        CONSENT_TTL_SEC,
+        settings.consent_ttl_sec,
         json.dumps(payload, ensure_ascii=False),
     )
 

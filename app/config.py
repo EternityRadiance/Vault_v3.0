@@ -14,10 +14,6 @@ class Settings(BaseSettings):
         description="Подключение SQLAlchemy"
     )
 
-    #jwt_secret: str = Field(..., min_length=32)
-    #jwt_algorithm: str = "RS256"
-    #access_token_ttl_min: int = Field(60, ge=1, le=24 * 60)
-
     password_pepper: str = Field(..., min_length=32)
     password_min_length: int = Field(12, ge=8, le=128)
 
@@ -32,9 +28,18 @@ class Settings(BaseSettings):
     refresh_token_ttl_days: int = 30
     auth_code_ttl_sec: int = 60
     pkce_required_for_public: bool = True
+    consent_ttl_sec: int = 300
 
     session_secret: str = Field(..., min_length=32)
     session_cookie_name: str = "vault_session"
     session_ttl_min: int = 30
+
+    @property
+    def is_production(self) -> bool:
+        return self.environment.lower() == "production"
+
+    @property
+    def session_cookie_secure(self) -> bool:
+        return self.is_production
 
 settings = Settings()

@@ -8,6 +8,9 @@
 *.sqlite
 *.sqlite3
 
+# Logs
+*.log
+
 # Python
 __pycache__/
 *.py[cod]
@@ -26,6 +29,10 @@ env/
 .idea/
 .vscode/
 *.swp
+
+# OS
+.DS_Store
+Thumbs.db
 
 # RSA keys
 keys/
