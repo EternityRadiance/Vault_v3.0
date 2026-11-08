@@ -10,9 +10,22 @@ from app.models.user import User
 from app.models.user_session import UserSession
 
 def _utcnow() -> datetime:
+    """Возвращает текущее время в UTC без часового пояса.
+
+    Возвращает:
+        Результат выполнения операции (тип: datetime).
+    """
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 def get_dashboard_counters(db: Session) -> dict[str, int]:
+    """Подсчитывает сводные показатели для административной панели.
+
+    Параметры:
+        db (Session): сессия базы данных для чтения и сохранения данных.
+
+    Возвращает:
+        Результат выполнения операции (тип: dict[str, int]).
+    """
     users = db.execute(select(func.count(User.id))).scalar_one()
     clients = db.execute(select(func.count(OAuthClient.id))).scalar_one()
     active_sessions = db.execute(
@@ -38,6 +51,17 @@ def get_login_sparkline_points(
         width: int = 200,
         height: int = 50,
 ) -> str:
+    """Формирует точки числа успешных входов для графика.
+
+    Параметры:
+        db (Session): сессия базы данных для получения числа успешных входов..
+        days (int): число дней, включаемых в диапазон графика..
+        width (int): ширина области графика в пикселях..
+        height (int): высота области графика в пикселях..
+
+    Возвращает:
+        Результат выполнения операции (тип: str).
+    """
     today = _utcnow().date()
     start = today - timedelta(days=days - 1)
 
@@ -82,6 +106,15 @@ def get_login_sparkline_meta(
         *,
         days: int = 7,
 ) -> dict[str, int | str]:
+    """Возвращает метаданные диапазона графика успешных входов.
+
+    Параметры:
+        db (Session): сессия базы данных для подсчета успешных входов..
+        days (int): число дней, включаемых в диапазон графика..
+
+    Возвращает:
+        Результат выполнения операции (тип: dict[str, int | str]).
+    """
     today = _utcnow().date()
     start = today - timedelta(days=days - 1)
 

@@ -15,6 +15,11 @@ from app.redis_client import is_blacklisted
 router = APIRouter(tags=["oauth"])
 
 def _utcnow() -> datetime:
+    """Возвращает текущее время в UTC без часового пояса.
+
+    Возвращает:
+        Результат выполнения операции (тип: datetime).
+    """
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 @router.post("/oauth/introspect")
@@ -26,6 +31,19 @@ def introspect(
     client_secret: str | None = Form(default=None),
     db: Session = Depends(get_db),
 ) -> dict:
+    """Аутентифицирует OAuth-клиента и возвращает сведения о действительности токена.
+
+    Параметры:
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+        token (str): исходное значение токена.
+        token_type_hint (str | None): подсказка о типе токена из запроса.
+        client_id (str | None): идентификатор OAuth-клиента.
+        client_secret (str | None): секрет OAuth-клиента.
+        db (Session): сессия базы данных для чтения и сохранения данных.
+
+    Возвращает:
+        Результат выполнения операции (тип: dict).
+    """
     client = authenticate_client(db, request, client_id, client_secret)
 
     if not client.is_confidential:
@@ -43,6 +61,14 @@ def introspect(
     return {"active": False}
 
 def _introspect_access(token: str) -> dict | None:
+    """Проверяет access token и формирует поля introspection-ответа.
+
+    Параметры:
+        token (str): исходное значение токена.
+
+    Возвращает:
+        Результат выполнения операции (тип: dict | None).
+    """
     try:
         payload = jwt.decode(
             token,
@@ -73,6 +99,15 @@ def _introspect_access(token: str) -> dict | None:
     }
 
 def _introspect_refresh(db: Session, raw_token: str) -> dict | None:
+    """Находит refresh token и формирует поля introspection-ответа.
+
+    Параметры:
+        db (Session): сессия базы данных для чтения и сохранения данных.
+        raw_token (str): исходное значение токена до хеширования.
+
+    Возвращает:
+        Результат выполнения операции (тип: dict | None).
+    """
     token_hash = sha256_hex(raw_token)
     rt = db.execute(
         select(RefreshToken).where(RefreshToken.token_hash == token_hash)

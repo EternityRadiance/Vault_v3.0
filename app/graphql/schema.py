@@ -29,6 +29,15 @@ schema = make_executable_schema(
 class CloseDbExtension(Extension):
 
     def request_finished(self, context):
+        """Освобождает ресурсы GraphQL-контекста после завершения запроса.
+
+        Параметры:
+            self (CloseDbExtension): экземпляр класса CloseDbExtension, переданный Python.
+            context: контекст запроса, предоставленный фреймворком.
+
+        Возвращает:
+            None (значение не возвращается).
+        """
         if not isinstance(context, dict):
             return
         db = context.get("db")

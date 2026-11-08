@@ -33,6 +33,11 @@ TEST_PASSWORD = "some long password 12345"
 
 
 def find_client() -> OAuthClient:
+    """Находит OAuth-клиента по идентификатору в конфигурации демонстрационного приложения.
+
+    Возвращает:
+        Результат выполнения операции (тип: OAuthClient).
+    """
     db = SessionLocal()
     try:
         for c in db.execute(select(OAuthClient).where(OAuthClient.is_confidential.is_(True))).scalars():
@@ -44,6 +49,14 @@ def find_client() -> OAuthClient:
 
 
 def rotate_secret(client_id: int) -> str:
+    """Выполняет ротацию секрета OAuth-клиента.
+
+    Параметры:
+        client_id (int): идентификатор OAuth-клиента.
+
+    Возвращает:
+        Результат выполнения операции (тип: str).
+    """
     admin = httpx.post(
         f"{VAULT}/auth/login",
         json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD},
@@ -58,6 +71,11 @@ def rotate_secret(client_id: int) -> str:
 
 
 def ensure_user() -> None:
+    """Обеспечивает наличие пользователя в демонстрационном приложении.
+
+    Возвращает:
+        None (значение не возвращается).
+    """
     db = SessionLocal()
     try:
         if db.execute(select(User).where(User.email == TEST_EMAIL)).scalar_one_or_none():
@@ -74,6 +92,11 @@ def ensure_user() -> None:
 
 
 def main() -> None:
+    """Запускает основную операцию сценария командной строки.
+
+    Возвращает:
+        None (значение не возвращается).
+    """
     client = find_client()
     print(f"[=] client: {client.client_id} ({client.name})")
 

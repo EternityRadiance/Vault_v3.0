@@ -9,11 +9,10 @@ from datetime import datetime, timezone
 from sqlalchemy import update
 from app.audit.events import OAuthEvents
 
-from app.audit.events import ClientEvents, UserEvents
+from app.audit.events import UserEvents
 from app.audit.service import get_client_info, write_event
 from app.auth.service import (
     EmailAlreadyExistsError,
-    InvalidCredentialsError,
     register_user,
 )
 from app.core.passwords import WeakPasswordError
@@ -31,6 +30,15 @@ audit_event_type = ObjectType("AuditEvent")
 
 @audit_event_type.field("metadata")
 def resolve_audit_metadata(event, info):
+    """Сериализует метаданные записи аудита для поля GraphQL.
+
+    Параметры:
+        event: запись аудита, для которой вычисляется значение поля.
+        info: контекст выполнения поля, переданный GraphQL-фреймворком.
+
+    Возвращает:
+        Результат выполнения операции (тип: str | NoneType).
+    """
     if event.metadata_json is None:
         return None
     return json.dumps(event.metadata_json, ensure_ascii=False)
@@ -39,6 +47,18 @@ def resolve_audit_metadata(event, info):
 @convert_kwargs_to_snake_case
 def resolve_users(obj, info, search=None, limit=50, offset=0):
 
+    """Возвращает страницу пользователей с необязательной фильтрацией по поисковой строке.
+
+    Параметры:
+        obj: родительский объект поля, переданный GraphQL-фреймворком.
+        info: контекст выполнения поля, переданный GraphQL-фреймворком.
+        search: строка поиска для фильтрации записей.
+        limit: максимальное количество возвращаемых записей.
+        offset: число пропускаемых записей при пагинации.
+
+    Возвращает:
+        Результат выполнения операции (тип: list).
+    """
     db: Session = info.context["db"]
 
     stmt = select(User).order_by(User.id)
@@ -51,6 +71,15 @@ def resolve_users(obj, info, search=None, limit=50, offset=0):
 @query.field("clients")
 def resolve_clients(obj, info):
 
+    """Возвращает список OAuth-клиентов для поля GraphQL.
+
+    Параметры:
+        obj: родительский объект поля, переданный GraphQL-фреймворком.
+        info: контекст выполнения поля, переданный GraphQL-фреймворком.
+
+    Возвращает:
+        Результат выполнения операции (тип: list).
+    """
     db: Session = info.context["db"]
     return db.execute(select(OAuthClient).order_by(OAuthClient.id)).scalars().all()
 
@@ -58,6 +87,18 @@ def resolve_clients(obj, info):
 @convert_kwargs_to_snake_case
 def resolve_audit_events(obj, info, event_type=None, limit=100, offset=0):
 
+    """Возвращает страницу событий аудита с необязательной фильтрацией по типу.
+
+    Параметры:
+        obj: родительский объект поля, переданный GraphQL-фреймворком.
+        info: контекст выполнения поля, переданный GraphQL-фреймворком.
+        event_type: тип события аудита.
+        limit: максимальное количество возвращаемых записей.
+        offset: число пропускаемых записей при пагинации.
+
+    Возвращает:
+        Результат выполнения операции (тип: list).
+    """
     db: Session = info.context["db"]
 
     stmt = select(AuditEvent).order_by(AuditEvent.created_at.desc())
@@ -69,6 +110,15 @@ def resolve_audit_events(obj, info, event_type=None, limit=100, offset=0):
 
 @query.field("me")
 def resolve_me(obj, info):
+    """Возвращает текущего пользователя из контекста GraphQL.
+
+    Параметры:
+        obj: родительский объект поля, переданный GraphQL-фреймворком.
+        info: контекст выполнения поля, переданный GraphQL-фреймворком.
+
+    Возвращает:
+        Результат выполнения операции (тип: User).
+    """
     return info.context["user"]
 
 
@@ -77,6 +127,17 @@ def resolve_me(obj, info):
 @convert_kwargs_to_snake_case
 def resolve_register_user(obj, info, email, password):
 
+    """Регистрирует пользователя через GraphQL и формирует ответ с access token.
+
+    Параметры:
+        obj: родительский объект поля, переданный GraphQL-фреймворком.
+        info: контекст выполнения поля, переданный GraphQL-фреймворком.
+        email: адрес электронной почты пользователя.
+        password: пароль пользователя.
+
+    Возвращает:
+        Результат выполнения операции (тип: dict).
+    """
     db: Session = info.context["db"]
     request = info.context.get("request")
 
@@ -97,6 +158,16 @@ def resolve_register_user(obj, info, email, password):
 @query.field("sessions")
 @convert_kwargs_to_snake_case
 def resolve_sessions(obj, info, user_id):
+    """Возвращает пользовательские сессии для поля GraphQL.
+
+    Параметры:
+        obj: родительский объект поля, переданный GraphQL-фреймворком.
+        info: контекст выполнения поля, переданный GraphQL-фреймворком.
+        user_id: идентификатор пользователя в базе данных.
+
+    Возвращает:
+        Результат выполнения операции (тип: list).
+    """
     db: Session = info.context["db"]
     try:
         uid = int(user_id)
@@ -113,6 +184,16 @@ def resolve_sessions(obj, info, user_id):
 @query.field("refreshTokens")
 @convert_kwargs_to_snake_case
 def resolve_refresh_tokens(obj, info, user_id):
+    """Возвращает refresh-токены пользователя для поля GraphQL.
+
+    Параметры:
+        obj: родительский объект поля, переданный GraphQL-фреймворком.
+        info: контекст выполнения поля, переданный GraphQL-фреймворком.
+        user_id: идентификатор пользователя в базе данных.
+
+    Возвращает:
+        Результат выполнения операции (тип: list).
+    """
     db: Session = info.context["db"]
     try:
         uid = int(user_id)
@@ -134,6 +215,20 @@ def resolve_create_client(
     grant_types=None,
     redirect_uris=None,
 ):
+    """Создаёт OAuth-клиента с заданными grant types, scope и redirect URI.
+
+    Параметры:
+        obj: родительский объект поля, переданный GraphQL-фреймворком.
+        info: контекст выполнения поля, переданный GraphQL-фреймворком.
+        name: имя ресурса или операции.
+        is_confidential: признак конфиденциального OAuth-клиента.
+        scopes: список выданных OAuth-разрешений.
+        grant_types: разрешенные типы OAuth grant.
+        redirect_uris: разрешенные redirect URI OAuth-клиента.
+
+    Возвращает:
+        Результат выполнения операции (тип: dict).
+    """
     import secrets
     from app.audit.events import OAuthEvents
     from app.audit.service import get_client_info, write_event
@@ -191,6 +286,16 @@ def resolve_create_client(
 @convert_kwargs_to_snake_case
 def resolve_disable_user(obj, info, user_id):
 
+    """Отключает учетную запись пользователя через административную GraphQL-операцию.
+
+    Параметры:
+        obj: родительский объект поля, переданный GraphQL-фреймворком.
+        info: контекст выполнения поля, переданный GraphQL-фреймворком.
+        user_id: идентификатор пользователя в базе данных.
+
+    Возвращает:
+        Результат выполнения операции (тип: User).
+    """
     db: Session = info.context["db"]
     request = info.context.get("request")
     current_user: User = info.context["user"]
@@ -229,6 +334,16 @@ def resolve_disable_user(obj, info, user_id):
 def resolve_revoke_user_sessions(obj, info, user_id):
     
 
+    """Отзывает пользовательские сессии через административную GraphQL-операцию.
+
+    Параметры:
+        obj: родительский объект поля, переданный GraphQL-фреймворком.
+        info: контекст выполнения поля, переданный GraphQL-фреймворком.
+        user_id: идентификатор пользователя в базе данных.
+
+    Возвращает:
+        Результат выполнения операции (тип: int).
+    """
     db: Session = info.context["db"]
     request = info.context.get("request")
     current_user: User = info.context["user"]
@@ -277,6 +392,16 @@ def resolve_revoke_user_sessions(obj, info, user_id):
 @mutation.field("rotateClientSecret")
 @convert_kwargs_to_snake_case
 def resolve_rotate_client_secret(obj, info, client_id):
+    """Создаёт новый секрет OAuth-клиента через административную GraphQL-операцию.
+
+    Параметры:
+        obj: родительский объект поля, переданный GraphQL-фреймворком.
+        info: контекст выполнения поля, переданный GraphQL-фреймворком.
+        client_id: идентификатор OAuth-клиента.
+
+    Возвращает:
+        Результат выполнения операции (тип: dict).
+    """
     import secrets
     from app.audit.events import OAuthEvents
     from app.audit.service import get_client_info, write_event
@@ -322,6 +447,16 @@ def resolve_rotate_client_secret(obj, info, client_id):
 @mutation.field("enableClient")
 @convert_kwargs_to_snake_case
 def resolve_enable_client(obj, info, client_id):
+    """Включает OAuth-клиента через административную GraphQL-операцию.
+
+    Параметры:
+        obj: родительский объект поля, переданный GraphQL-фреймворком.
+        info: контекст выполнения поля, переданный GraphQL-фреймворком.
+        client_id: идентификатор OAuth-клиента.
+
+    Возвращает:
+        Результат выполнения операции (тип: OAuthClient | None).
+    """
     from app.audit.events import OAuthEvents
     from app.audit.service import get_client_info, write_event
 
@@ -364,6 +499,16 @@ def resolve_enable_client(obj, info, client_id):
 @mutation.field("disableClient")
 @convert_kwargs_to_snake_case
 def resolve_disable_client(obj, info, client_id):
+    """Отключает OAuth-клиента через административную GraphQL-операцию.
+
+    Параметры:
+        obj: родительский объект поля, переданный GraphQL-фреймворком.
+        info: контекст выполнения поля, переданный GraphQL-фреймворком.
+        client_id: идентификатор OAuth-клиента.
+
+    Возвращает:
+        Обновлённый OAuth-клиент (тип: OAuthClient).
+    """
     from app.audit.events import OAuthEvents
     from app.audit.service import get_client_info, write_event
 

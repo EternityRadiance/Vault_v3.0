@@ -8,6 +8,15 @@ from app.redis_client import is_blacklisted
 
 
 def get_context_value(request, data) -> dict:
+    """Формирует контекст GraphQL-запроса из HTTP-запроса и данных выполнения.
+
+    Параметры:
+        request: HTTP-запрос, переданный веб-фреймворком.
+        data: данные выполнения GraphQL-запроса.
+
+    Возвращает:
+        Результат выполнения операции (тип: dict).
+    """
     db = db_session_module.SessionLocal()
     context = {"request": request, "db": db, "user": None}
 

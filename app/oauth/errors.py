@@ -19,6 +19,16 @@ def oauth_json_error(
         description: str | None = None,
         status_code: int = 400,
 ) -> NoReturn:
+    """Формирует OAuth-ошибку в JSON-ответе с указанным HTTP-статусом.
+
+    Параметры:
+        error (str): код OAuth-ошибки.
+        description (str | None): дополнительное описание ошибки.
+        status_code (int): HTTP-код статуса ответа.
+
+    Возвращает:
+        Обычное значение не возвращается; функция завершается исключением (тип: NoReturn).
+    """
     if error == INVALID_CLIENT:
         status_code = 401
 
@@ -34,6 +44,17 @@ def oauth_redirect_error(
         state: str | None = None,
         description: str | None = None,
 ) -> RedirectResponse:
+    """Формирует перенаправление с параметрами OAuth-ошибки и состоянием запроса.
+
+    Параметры:
+        redirect_uri (str): адрес возврата OAuth-клиента.
+        error (str): код OAuth-ошибки.
+        state (str | None): значение state для связывания запроса и ответа OAuth.
+        description (str | None): дополнительное описание ошибки.
+
+    Возвращает:
+        Результат выполнения операции (тип: RedirectResponse).
+    """
     params = {"error": error}
     if description:
         params["error_description"] = description

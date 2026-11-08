@@ -21,6 +21,16 @@ app = FastAPI(
 
 class NoCacheMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
+        """Передает запрос обработчику и добавляет необходимые общие заголовки к ответу.
+
+        Параметры:
+            self (NoCacheMiddleware): экземпляр класса NoCacheMiddleware, переданный Python.
+            request: HTTP-запрос, переданный веб-фреймворком.
+            call_next: следующий обработчик middleware, которому передается HTTP-запрос.
+
+        Возвращает:
+            Результат middleware-обработчика (тип: Response).
+        """
         response = await call_next(request)
         if request.url.path.startswith(("/admin", "/account")):
             response.headers["Cache-Control"] = "no-store"
@@ -45,6 +55,11 @@ app.include_router(web_router)
 
 @app.get("/health", tags=["meta"])
 def health():
+    """Возвращает состояние приложения для проверки доступности сервиса.
+
+    Возвращает:
+        Результат выполнения операции (тип: dict).
+    """
     return {"status": "ok", "app": settings.app_name}
 
 app.mount("/graphql", graphql_app)

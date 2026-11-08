@@ -13,6 +13,11 @@ from app.config import settings
 
 @lru_cache(maxsize=1)
 def load_private_key() -> rsa.RSAPrivateKey:
+    """Загружает закрытый RSA-ключ из настроенного файла.
+
+    Возвращает:
+        Результат выполнения операции (тип: rsa.RSAPrivateKey).
+    """
     path = Path(settings.rsa_key_path)
     if not path.is_absolute():
         path = Path(__file__).resolve().parents[3] / path
@@ -25,9 +30,19 @@ def load_private_key() -> rsa.RSAPrivateKey:
 
 @lru_cache(maxsize=1)
 def load_public_key() -> rsa.RSAPublicKey:
+    """Получает открытый RSA-ключ, соответствующий закрытому ключу приложения.
+
+    Возвращает:
+        Результат выполнения операции (тип: rsa.RSAPublicKey).
+    """
     return load_private_key().public_key()
 
 def _private_pem() -> str:
+    """Возвращает закрытый RSA-ключ в PEM-представлении.
+
+    Возвращает:
+        Результат выполнения операции (тип: str).
+    """
     return load_private_key().private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.PKCS8,
@@ -35,6 +50,11 @@ def _private_pem() -> str:
     ).decode("utf-8")
 
 def _public_pem() -> str:
+    """Возвращает открытый RSA-ключ в PEM-представлении.
+
+    Возвращает:
+        Результат выполнения операции (тип: str).
+    """
     return load_public_key().public_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PublicFormat.SubjectPublicKeyInfo,
@@ -47,6 +67,18 @@ def sign_access_token(
         ttl_sec: int | None = None,
         extra_claims: dict[str, Any] | None = None,
 ) -> str:
+    """Создаёт и подписывает JWT-токен доступа с указанными claims.
+
+    Параметры:
+        sub (str | int): идентификатор субъекта токена.
+        client_id (str): идентификатор OAuth-клиента.
+        scopes (list[str]): список выданных OAuth-разрешений.
+        ttl_sec (int | None): срок действия в секундах.
+        extra_claims (dict[str, Any] | None): дополнительные claims, добавляемые к access token..
+
+    Возвращает:
+        Результат выполнения операции (тип: str).
+    """
     if ttl_sec is None:
         ttl_sec = settings.access_token_ttl_sec
 
@@ -79,6 +111,19 @@ def sign_id_token(
         nonce: str | None = None,
         ttl_sec: int | None = 300,
 ) -> str:
+    """Создаёт и подписывает OpenID Connect ID-токен для пользователя.
+
+    Параметры:
+        sub (str | int): идентификатор субъекта токена.
+        client_id (str): идентификатор OAuth-клиента.
+        user (Any): пользователь, данные или права которого обрабатываются.
+        scopes (list[str]): список выданных OAuth-разрешений.
+        nonce (str | None): nonce запроса аутентификации.
+        ttl_sec (int | None): срок действия в секундах.
+
+    Возвращает:
+        Результат выполнения операции (тип: str).
+    """
     now = datetime.now(timezone.utc)
     payload: dict[str, Any] = {
         "iss": settings.issuer,
@@ -112,6 +157,16 @@ def verify_token(
         audience: str | None = None,
         issuer: str | None = None,
 ) -> dict:
+    """Проверяет JWT, включая подпись, аудиторию и издателя, и возвращает claims.
+
+    Параметры:
+        token (str): исходное значение токена.
+        audience (str | None): ожидаемая аудитория токена.
+        issuer (str | None): ожидаемый издатель токена.
+
+    Возвращает:
+        Результат выполнения операции (тип: dict).
+    """
     if not token or not isinstance(token, str):
         raise ValueError("Empty token")
 

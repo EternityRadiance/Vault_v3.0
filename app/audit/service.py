@@ -26,6 +26,20 @@ def write_event(
         metadata: dict[str, Any] | None = None,
 ) -> AuditEvent:
 
+    """Проверяет метаданные и сохраняет запись события аудита.
+
+    Параметры:
+        db (Session): сессия базы данных для чтения и сохранения данных.
+        event_type (str): тип события аудита.
+        actor_id (int | None): идентификатор пользователя, выполнившего действие.
+        client_id (str | None): идентификатор OAuth-клиента.
+        ip (str | None): IP-адрес клиента.
+        user_agent (str | None): значение заголовка User-Agent клиента.
+        metadata (dict[str, Any] | None): метаданные события или операции.
+
+    Возвращает:
+        Результат выполнения операции (тип: AuditEvent).
+    """
     if metadata:
         forbidden = FORBIDDEN_METADATA_KEYS & metadata.keys()
         if forbidden:
@@ -48,6 +62,14 @@ def write_event(
 
 def get_client_info(request) -> dict[str, str | None]:
 
+    """Извлекает IP-адрес и User-Agent HTTP-клиента из запроса.
+
+    Параметры:
+        request: HTTP-запрос, переданный веб-фреймворком.
+
+    Возвращает:
+        Результат выполнения операции (тип: dict[str, str | None]).
+    """
     ip = None
     user_agent = None
 

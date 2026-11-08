@@ -14,10 +14,13 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 
 def _extract_bearer_token(request: Request) -> str | None:
-    """
-    Достаёт Bearer-токен только из заголовка Authorization.
-    Cookie vault_session — это SSR-сессия (SessionMiddleware),
-    к JWT-аутентификации отношения не имеет.
+    """Извлекает Bearer-токен только из заголовка Authorization и не использует cookie веб-сессии.
+
+    Параметры:
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+
+    Возвращает:
+        Результат выполнения операции (тип: str | None).
     """
     auth = request.headers.get("Authorization")
     if auth:
@@ -32,6 +35,16 @@ def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: Session = Depends(get_db),
 ) -> User:
+    """Проверяет токен аутентификации и загружает соответствующего активного пользователя.
+
+    Параметры:
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+        credentials (HTTPAuthorizationCredentials | None): учетные данные Bearer, полученные от FastAPI security-зависимости..
+        db (Session): сессия базы данных для чтения и сохранения данных.
+
+    Возвращает:
+        Результат выполнения операции (тип: User).
+    """
     token = credentials.credentials if credentials else None
     if not token:
         token = _extract_bearer_token(request)
@@ -107,6 +120,14 @@ def get_current_user(
 
 
 def require_admin(user: User = Depends(get_current_user)) -> User:
+    """Проверяет наличие у текущего пользователя прав администратора.
+
+    Параметры:
+        user (User): пользователь, данные или права которого обрабатываются.
+
+    Возвращает:
+        Результат выполнения операции (тип: User).
+    """
     if not user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

@@ -4,7 +4,7 @@ import json
 import secrets
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
-from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -21,19 +21,40 @@ from app.redis_client import get_redis
 from app.web.context import render
 from app.web.csrf import verify_csrf
 from app.web.deps import require_web_user
-from app.web.flash import flash
 
 router = APIRouter(tags=["web-oauth"])
 
 CONSENT_KEY_PREFIX = "consent:"
 
 def _utcnow() -> datetime:
+    """Возвращает текущее время в UTC без часового пояса.
+
+    Возвращает:
+        Результат выполнения операции (тип: datetime).
+    """
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 def _sha256_hex(value: str) -> str:
+    """Вычисляет SHA-256-хеш строки в шестнадцатеричном виде.
+
+    Параметры:
+        value (str): значение для обработки.
+
+    Возвращает:
+        Результат выполнения операции (тип: str).
+    """
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 def _load_pending(request_id: str, user: User) -> dict | None:
+    """Загружает и проверяет ожидающий запрос согласия пользователя.
+
+    Параметры:
+        request_id (str): идентификатор ожидающего OAuth-запроса согласия..
+        user (User): пользователь, данные или права которого обрабатываются.
+
+    Возвращает:
+        Результат выполнения операции (тип: dict | None).
+    """
     raw = get_redis().get(f"{CONSENT_KEY_PREFIX}{request_id}")
     if not raw:
         return None
@@ -54,6 +75,17 @@ def consent_page(
     db: Session = Depends(get_db),
     user: User = Depends(require_web_user)
 ):
+    """Формирует страницу подтверждения запрошенных OAuth-разрешений.
+
+    Параметры:
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+        request_id (str): идентификатор ожидающего OAuth-запроса, для которого показывается согласие..
+        db (Session): сессия базы данных для чтения и сохранения данных.
+        user (User): пользователь, данные или права которого обрабатываются.
+
+    Возвращает:
+        Результат выполнения операции (тип: TemplateResponse).
+    """
     data = _load_pending(request_id, user)
     if data is None:
         raise HTTPException(
@@ -91,6 +123,16 @@ async def consent_submit(
     db: Session = Depends(get_db),
     user: User = Depends(require_web_user),
 ):
+    """Обрабатывает решение пользователя по OAuth-согласию и перенаправляет клиента.
+
+    Параметры:
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+        db (Session): сессия базы данных для чтения и сохранения данных.
+        user (User): пользователь, данные или права которого обрабатываются.
+
+    Возвращает:
+        Результат выполнения операции (тип: RedirectResponse).
+    """
     form = await request.form()
     verify_csrf(request, form.get("csrf_token"))
 

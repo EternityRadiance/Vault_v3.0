@@ -18,6 +18,11 @@ from app.oauth.tokens import (
 )
 
 def _utcnow() -> timezone:
+    """Возвращает текущее время в UTC без часового пояса.
+
+    Возвращает:
+        Результат выполнения операции (тип: timezone).
+    """
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 def handle_refresh_token_grant(
@@ -28,6 +33,18 @@ def handle_refresh_token_grant(
         refresh_token: str | None,
         scope: str | None,
 ) -> dict:
+    """Проверяет и ротирует refresh token, обрабатывая повторное использование.
+
+    Параметры:
+        db (Session): сессия базы данных для чтения и сохранения данных.
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+        client (OAuthClient): OAuth-клиент, для которого выполняется операция.
+        refresh_token (str | None): значение refresh token из запроса.
+        scope (str | None): строка запрошенных OAuth-разрешений.
+
+    Возвращает:
+        Результат выполнения операции (тип: dict).
+    """
     if not refresh_token:
         oauth_json_error(INVALID_GRANT, "refresh_token is required")
 
@@ -138,6 +155,20 @@ def _revoke_family(
     actor_id: int | None,
     client_id: str,
 ) -> None:
+    """Отзывает все refresh-токены указанного семейства и записывает событие аудита.
+
+    Параметры:
+        db (Session): сессия базы данных для чтения и сохранения данных.
+        family_id (str): идентификатор семейства refresh-токенов.
+        reason (str): причина выполняемой операции или отзыва.
+        ip (str | None): IP-адрес клиента.
+        user_agent (str | None): значение заголовка User-Agent клиента.
+        actor_id (int | None): идентификатор пользователя, выполнившего действие.
+        client_id (str): идентификатор OAuth-клиента.
+
+    Возвращает:
+        None (значение не возвращается).
+    """
     now = _utcnow()
     db.execute(
         update(RefreshToken)

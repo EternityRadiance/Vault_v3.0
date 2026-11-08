@@ -1,169 +1,120 @@
-# Vault — OAuth2/OIDC Provider + SSR Web UI
+# Vault — OAuth 2.0 / OpenID Connect
 
-Сервис управления пользователями и OAuth-клиентами с веб-интерфейсом на SSR (Jinja2).
-Реализует **OAuth2 (RFC 6749)** и **OpenID Connect** + полноценный сайт для пользователей
-и администраторов.
+Vault — учебный монолитный сервис на FastAPI: OAuth 2.0/OIDC-провайдер,
+REST- и GraphQL API, а также серверный веб-интерфейс для пользователей и
+администраторов. Проект предназначен для локального запуска и изучения; перед
+публикацией в интернете требуется отдельная проверка и настройка безопасности.
 
-## Что внутри
+## Возможности
 
-**OAuth2/OIDC**
-- RS256-подписи JWT, публикация **JWKS**, OIDC Discovery.
-- Grant-типы: `authorization_code` (PKCE S256), `refresh_token` (rotation + reuse detection),
-  `password` (deprecated), `client_credentials`.
-- Отзыв токенов (`/oauth/revoke`, RFC 7009), интроспекция (`/oauth/introspect`, RFC 7662).
-- Blacklist access-токенов в Redis (TTL = остаток жизни).
+- OAuth 2.0: `authorization_code` с PKCE, `refresh_token`,
+  `client_credentials` и оставленный для совместимости `password`.
+- OIDC: ID-токены RS256, UserInfo, Discovery и JWKS.
+- Отзыв и интроспекция токенов; обнаружение повторного использования refresh-токена.
+- REST API для регистрации и входа, GraphQL API для административных операций.
+- SSR-интерфейс на Jinja2: регистрация и вход, кабинет, OAuth consent, управление
+  клиентами и пользователями, аудит.
+- PostgreSQL для постоянных данных; Redis для blacklist access-токенов и запросов
+  согласия.
 
-**SSR Web UI**
-- Jinja2-шаблоны: базовый layout, макросы, фильтры, автоэкранирование.
-- Cookie-сессии (`WebSession` в БД + `SessionMiddleware`), **отдельные от OAuth-токенов**.
-- CSRF-защита на всех POST-формах (double-submit, `secrets.compare_digest`).
-- Личный кабинет: профиль, активные сессии, смена пароля.
-- Админ-консоль: дашборд, пользователи, OAuth-клиенты, аудит с фильтрами и CSV-экспортом.
-- Flash-сообщения, пагинация, live-поиск, тёмная тема (progressive enhancement).
-- Consent screen для OAuth (см. `/web/consent`, лаб. 4 п. 9).
+## Требования и запуск
 
-## Стек
-
-- **FastAPI** — веб-фреймворк.
-- **Ariadne** — schema-first GraphQL (для API-клиентов).
-- **SQLAlchemy 2.x**, **Alembic** — ORM и миграции.
-- **PostgreSQL** — БД (SQLite для тестов).
-- **Redis** — blacklist access-токенов.
-- **Jinja2** — SSR-шаблоны.
-- **itsdangerous** (через Starlette `SessionMiddleware`) — подпись cookie-сессий.
-- **python-jose**, **cryptography** — JWT (RS256).
-- **argon2-cffi** — Argon2id для паролей и `client_secret`.
-- **zxcvbn** — политика паролей.
-- **user-agents** — парсинг User-Agent в списке сессий.
-
-## Установка
+Нужны Python 3.10+ (используйте версию, совместимую с установленными
+зависимостями), PostgreSQL и Redis. Подготовьте виртуальное окружение и установите
+зависимости:
 
 ```bash
-git clone <URL_репозитория>
-cd lab4_vault
+git clone <URL-репозитория>
+cd <каталог-проекта>
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 ```
 
-## Настройка
-1) Скопировать .env.example в .env:
+Создайте `.env` в корне проекта. Обязательные значения:
 
-```bash
-cp .env.example .env
+```dotenv
+DATABASE_URL=postgresql+psycopg2://vault:<DB_PASSWORD>@127.0.0.1:5432/vault_db
+PASSWORD_PEPPER=<случайное_значение_не_короче_32_символов>
+SESSION_SECRET=<отдельное_случайное_значение_не_короче_32_символов>
 ```
 
-
-2) Сгенерировать PASSWORD_PEPPER:
+Замените все значения в угловых скобках своими; это обозначения, а не готовые
+учётные данные. Сгенерируйте два независимых секрета локально, не добавляйте их в
+репозиторий и не отправляйте в логи:
 
 ```bash
 python -c "import secrets; print(secrets.token_urlsafe(48))"
 ```
 
-Вставить в .env PASSWORD_PEPPER.
-
-3) Сгенерировать RSA-ключи:
+Выполните эту команду отдельно для `PASSWORD_PEPPER` и `SESSION_SECRET`.
+Приватный RSA-ключ создаётся отдельно:
 
 ```bash
 python scripts/gen_keys.py
 ```
 
-Создаст keys/rsa_private.pem и keys/rsa_public.pem. Приватный ключ не должен попадать в git — keys/ в .gitignore
+Скрипт сохраняет ключи в `keys/`; не публикуйте и не пересылайте
+`keys/rsa_private.pem`. Убедитесь, что PostgreSQL и Redis доступны по адресам из
+конфигурации (`DATABASE_URL` и `REDIS_URL`; Redis по умолчанию —
+`redis://localhost:6379/0`). Примените миграции и запустите приложение:
 
-4) Поднять PostgreSQL (если не установлен):
-
-```bash
-sudo apt install postgresql postgresql-contrib
-sudo -u postgres psql -c "CREATE USER vault WITH PASSWORD '<password>';"
-sudo -u postgres psql -c "CREATE DATABASE vault_db OWNER <username>;"
-```
-
-
-5) Поднять Redis (Docker):
-
-```bash
-docker run -d --name vault-redis --restart=always -p 6379:6379 redis:7-alpine
-```
-
-
-## Запуск
 ```bash
 alembic upgrade head
 python run.py
 ```
 
-## Интерфейсы
-1) Swagger UI - http://127.0.0.1:8000/docs
-2) GraphQL Playground - http://127.0.0.1:8000/graphql/
-3) Authorization endpoint (PKCE) - http://127.0.0.1:8000/oauth/authorize
-4) Token endpoint (4 grant-типа) - http://127.0.0.1:8000/oauth/token
-5) Отзыв токена - http://127.0.0.1:8000/oauth/revoke
-6) Интроспекция - http://127.0.0.1:8000/oauth/introspect
-7) OIDC Userinfo - http://127.0.0.1:8000/oauth/userinfo
-8) OIDC Discovery - http://127.0.0.1:8000/.well-known/openid-configuration
-9) JWKS - http://127.0.0.1:8000/.well-known/jwks.json
-
-## SSR-веб-интерфейс
-1) Вход(форма) - http://127.0.0.1:8000/web/login
-2) Регистрация - http://127.0.0.1:8000/web/register
-3) Личный кабинет(профиль) - http://127.0.0.1:8000/web/account
-4) Активные сессии - http://127.0.0.1:8000/web/account/sessions
-5) Смена пароля - http://127.0.0.1:8000/web/account/security
-6) Админ-консоль: дашборд - http://127.0.0.1:8000/web/admin
-7) Пользователи - http://127.0.0.1:8000/web/admin/users
-8) Карточка пользователя - http://127.0.0.1:8000/web/admin/users/{id}
-9) OAuth-клиенты - http://127.0.0.1:8000/web/admin/clients
-10) Создать клиента - http://127.0.0.1:8000/web/admin/clients/new
-11) Детали клиента - http://127.0.0.1:8000/web/admin/clients/{id}
-12) Аудит с фильтрами - http://127.0.0.1:8000/web/admin/audit
-13) Экспорт аудита в CSV - http://127.0.0.1:8000/web/admin/audit/export.csv
-14) OAuth consent screen - http://127.0.0.1:8000/web/consent
-
-## Назначение админа
-После регистрации через /web/register выдай себе админку:
-```bash
-python scripts/make_admin.py user@example.com
-```
-
-## OAuth2/OIDC эндпоинты
-
-| Метод | Путь | Назначение |
-|-------|------|-----------|
-| GET  | `/oauth/authorize` | Authorization endpoint (PKCE) |
-| POST | `/oauth/token` | Token endpoint (4 grant-типа) |
-| POST | `/oauth/revoke` | Отзыв токена (RFC 7009) |
-| POST | `/oauth/introspect` | Интроспекция (RFC 7662) |
-| GET  | `/oauth/userinfo` | OIDC UserInfo |
-| GET  | `/.well-known/jwks.json` | JWKS |
-| GET  | `/.well-known/openid-configuration` | OIDC Discovery |
-
-## Поддерживаемые grant-типы
-
-- `authorization_code` (с **PKCE S256** — обязателен для публичных клиентов).
-- `refresh_token` (с **rotation** и **reuse detection**).
-- `password` (deprecated в OAuth 2.1, но оставлен для first-party приложений).
-- `client_credentials` (только для конфиденциальных клиентов).
-
-## demo-RP
-Демонстрационный OIDC-клиент (FastAPI + Jinja2).
+Сервер разработки слушает `127.0.0.1:8000`. Проверка готовности:
 
 ```bash
-uvicorn demo_rp.main:app --port 8001
+curl http://127.0.0.1:8000/health
 ```
+
+Подробная конфигурация и примеры OAuth-запросов приведены в
+[инструкции по запуску и использованию](USAGE.md); описание компонентов и
+потоков — в [архитектуре](ARCHITECTURE.md).
+
+## Основные адреса
+
+| Назначение | Метод и путь |
+|---|---|
+| Проверка состояния | `GET /health` |
+| REST-регистрация и вход | `POST /auth/register`, `POST /auth/login` |
+| Данные текущего пользователя | `GET /auth/me` |
+| GraphQL | `/graphql/` |
+| Авторизация и согласие OAuth | `GET /oauth/authorize`, `/web/consent` |
+| Обмен кода или токена | `POST /oauth/token` |
+| Отзыв и интроспекция | `POST /oauth/revoke`, `POST /oauth/introspect` |
+| OIDC UserInfo | `GET /oauth/userinfo` |
+| Discovery и ключи | `GET /.well-known/openid-configuration`, `GET /.well-known/jwks.json` |
+| SSR-интерфейс | `/web/login`, `/web/register`, `/web/account` |
+| Консоль администратора | `/web/admin` |
+
+Интерфейс Swagger доступен по `/docs`. OAuth-адрес `/oauth/authorize` использует
+веб-сессию и перенаправляет пользователя на вход и страницу согласия; это не
+endpoint для Bearer-аутентификации. Точные примеры и ограничения описаны в
+[USAGE.md](USAGE.md).
 
 ## Тесты
+
 ```bash
-python examples/check_oauth.py
 pytest
 ```
 
-## Безопасность
+`examples/check_oauth.py` — отдельный сценарий проверки работающего сервера,
+а не замена тестового набора. В его настройках должны быть указаны актуальные
+адреса и зарегистрированный клиент; не помещайте секреты в репозиторий.
 
-- **JWT (RS256)** для всех токенов: REST, GraphQL, OAuth2. Публичный ключ в JWKS.
-- **Argon2id + pepper** для паролей и `client_secret`.
-- **PKCE S256** для публичных клиентов.
-- **Redirect URI** — точное совпадение.
-- **Refresh rotation** + reuse detection -> отзыв всего семейства.
-- **Blacklist access-токенов** в Redis (TTL = остаток жизни).
-- **httponly cookies** для `/admin/` и `/account/` + CSRF-токен.
-- `.env`, `keys/`, `*.db` — в `.gitignore`.
+## Важные замечания по безопасности
+
+- Не используйте демонстрационные настройки для реального развертывания.
+  Настройте TLS, секреты и сетевой доступ к PostgreSQL/Redis; не публикуйте Redis
+  без аутентификации в недоверенную сеть.
+- `keys/rsa_private.pem`, `.env`, пароли, access/refresh-токены и секреты клиентов
+  являются конфиденциальными. `client_secret` показывается при создании или
+  ротации один раз.
+- `password` grant устарел и оставлен для учебной/совместимой интеграции;
+  предпочитайте `authorization_code` с PKCE.
+- Cookie веб-сессии настроена как `HttpOnly`, `SameSite=Lax`; флаг `Secure`
+  включается при `ENVIRONMENT=production`. Для защищенного развертывания
+  используйте HTTPS.

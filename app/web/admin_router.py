@@ -1,6 +1,6 @@
 from __future__ import annotations
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, Request, Form, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Request, HTTPException, Query, status
 from fastapi.responses import RedirectResponse, StreamingResponse
 from functools import lru_cache
 from sqlalchemy import func, select, update
@@ -41,6 +41,11 @@ USERS_PAGE_SIZE = 25
 AUDIT_PAGE_SIZE = 50
 
 def _utcnow() -> datetime:
+    """Возвращает текущее время в UTC без часового пояса.
+
+    Возвращает:
+        Результат выполнения операции (тип: datetime).
+    """
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
@@ -56,6 +61,16 @@ def dashboard(
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_web),
 ):
+    """Формирует страницу административной панели со сводными показателями.
+
+    Параметры:
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+        db (Session): сессия базы данных для чтения и сохранения данных.
+        user (User): пользователь, данные или права которого обрабатываются.
+
+    Возвращает:
+        Результат выполнения операции (тип: TemplateResponse).
+    """
     counters = get_dashboard_counters(db)
     sparkline_points = get_login_sparkline_points(db, days=7)
     sparkline_meta = get_login_sparkline_meta(db, days=7)
@@ -73,6 +88,14 @@ def dashboard(
 def stats_json(
     db: Session = Depends(get_db),
 ) -> dict:
+    """Возвращает сводные показатели панели в формате JSON.
+
+    Параметры:
+        db (Session): сессия базы данных для чтения и сохранения данных.
+
+    Возвращает:
+        Результат выполнения операции (тип: dict).
+    """
     return get_dashboard_counters(db)
 
 @router.get("/users")
@@ -84,6 +107,19 @@ def users_list(
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_web),
 ):
+    """Формирует страницу или фрагмент списка пользователей с поиском и пагинацией.
+
+    Параметры:
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+        q (str | None): строка поиска или фильтра списка.
+        page (int): номер страницы списка.
+        partial (int): признак запроса HTML-фрагмента вместо полной страницы.
+        db (Session): сессия базы данных для чтения и сохранения данных.
+        user (User): пользователь, данные или права которого обрабатываются.
+
+    Возвращает:
+        Результат выполнения операции (тип: TemplateResponse).
+    """
     q_norm = (q or "").strip()[:100]
 
     base_stmt = select(User)
@@ -123,6 +159,17 @@ def user_detail(
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_web),
 ):
+    """Формирует страницу данных выбранного пользователя.
+
+    Параметры:
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+        user_id (int): идентификатор пользователя в базе данных.
+        db (Session): сессия базы данных для чтения и сохранения данных.
+        user (User): пользователь, данные или права которого обрабатываются.
+
+    Возвращает:
+        Результат выполнения операции (тип: TemplateResponse).
+    """
     target = db.execute(
         select(User).where(User.id == user_id)
     ).scalar_one_or_none()
@@ -147,6 +194,17 @@ async def user_disable(
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_web),
 ):
+    """Отключает выбранного пользователя и перенаправляет обратно к его странице.
+
+    Параметры:
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+        user_id (int): идентификатор пользователя в базе данных.
+        db (Session): сессия базы данных для чтения и сохранения данных.
+        user (User): пользователь, данные или права которого обрабатываются.
+
+    Возвращает:
+        Результат выполнения операции (тип: RedirectResponse).
+    """
     form_data = await request.form()
     verify_csrf(request, form_data.get("csrf_token"))
 
@@ -194,6 +252,17 @@ async def user_enable(
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_web),
 ):
+    """Включает выбранного пользователя и перенаправляет обратно к его странице.
+
+    Параметры:
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+        user_id (int): идентификатор пользователя в базе данных.
+        db (Session): сессия базы данных для чтения и сохранения данных.
+        user (User): пользователь, данные или права которого обрабатываются.
+
+    Возвращает:
+        Результат выполнения операции (тип: RedirectResponse).
+    """
     form_data = await request.form()
     verify_csrf(request, form_data.get("csrf_token"))
 
@@ -225,6 +294,17 @@ async def user_revoke_sessions(
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_web)
 ):
+    """Отзывает все веб-сессии выбранного пользователя.
+
+    Параметры:
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+        user_id (int): идентификатор пользователя в базе данных.
+        db (Session): сессия базы данных для чтения и сохранения данных.
+        user (User): пользователь, данные или права которого обрабатываются.
+
+    Возвращает:
+        Результат выполнения операции (тип: RedirectResponse).
+    """
     form_data = await request.form()
     verify_csrf(request, form_data.get("csrf_token"))
 
@@ -271,6 +351,16 @@ def clients_list(
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_web),
 ):
+    """Формирует страницу списка OAuth-клиентов.
+
+    Параметры:
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+        db (Session): сессия базы данных для чтения и сохранения данных.
+        user (User): пользователь, данные или права которого обрабатываются.
+
+    Возвращает:
+        Результат выполнения операции (тип: TemplateResponse).
+    """
     clients = db.execute(
         select(OAuthClient).order_by(OAuthClient.id)
     ).scalars().all()
@@ -289,6 +379,16 @@ def client_new_page(
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_web),
 ):
+    """Формирует страницу создания OAuth-клиента.
+
+    Параметры:
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+        db (Session): сессия базы данных для чтения и сохранения данных.
+        user (User): пользователь, данные или права которого обрабатываются.
+
+    Возвращает:
+        Результат выполнения операции (тип: TemplateResponse).
+    """
     return render(
         request,
         "admin/client_new.html",
@@ -304,6 +404,16 @@ async def client_new_submit(
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_web),
 ):
+    """Обрабатывает форму создания OAuth-клиента и показывает результат.
+
+    Параметры:
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+        db (Session): сессия базы данных для чтения и сохранения данных.
+        user (User): пользователь, данные или права которого обрабатываются.
+
+    Возвращает:
+        Результат выполнения операции (тип: RedirectResponse | TemplateResponse).
+    """
     form_data = await request.form()
     verify_csrf(request, form_data.get("csrf_token"))
 
@@ -384,6 +494,17 @@ def client_secret_shown(
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_web),
 ):
+    """Отображает новый секрет клиента либо перенаправляет на страницу клиента.
+
+    Параметры:
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+        client_pk (int): первичный ключ OAuth-клиента в базе данных.
+        db (Session): сессия базы данных для чтения и сохранения данных.
+        user (User): пользователь, данные или права которого обрабатываются.
+
+    Возвращает:
+        Результат выполнения операции (тип: TemplateResponse | RedirectResponse).
+    """
     payload = request.session.pop("client_secret_once", None)
 
     if not payload or payload.get("client_pk") != client_pk:
@@ -408,6 +529,17 @@ def client_detail(
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_web),
 ):
+    """Формирует страницу данных выбранного OAuth-клиента.
+
+    Параметры:
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+        client_pk (int): первичный ключ OAuth-клиента в базе данных.
+        db (Session): сессия базы данных для чтения и сохранения данных.
+        user (User): пользователь, данные или права которого обрабатываются.
+
+    Возвращает:
+        Результат выполнения операции (тип: TemplateResponse).
+    """
     client = db.execute(
         select(OAuthClient).where(OAuthClient.id == client_pk)
     ).scalar_one_or_none()
@@ -429,6 +561,17 @@ async def client_rotate_secret(
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_web),
 ):
+    """Заменяет секрет OAuth-клиента и показывает его однократно.
+
+    Параметры:
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+        client_pk (int): первичный ключ OAuth-клиента в базе данных.
+        db (Session): сессия базы данных для чтения и сохранения данных.
+        user (User): пользователь, данные или права которого обрабатываются.
+
+    Возвращает:
+        Результат выполнения операции (тип: RedirectResponse).
+    """
     form_data = await request.form()
     verify_csrf(request, form_data.get("csrf_token"))
 
@@ -472,6 +615,17 @@ async def client_enable(
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_web),
 ):
+    """Включает выбранного OAuth-клиента.
+
+    Параметры:
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+        client_pk (int): первичный ключ OAuth-клиента в базе данных.
+        db (Session): сессия базы данных для чтения и сохранения данных.
+        user (User): пользователь, данные или права которого обрабатываются.
+
+    Возвращает:
+        Результат выполнения операции (тип: RedirectResponse).
+    """
     form_data = await request.form()
     verify_csrf(request, form_data.get("csrf_token"))
 
@@ -505,6 +659,17 @@ async def client_disable(
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_web),
 ):
+    """Отключает выбранного OAuth-клиента.
+
+    Параметры:
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+        client_pk (int): первичный ключ OAuth-клиента в базе данных.
+        db (Session): сессия базы данных для чтения и сохранения данных.
+        user (User): пользователь, данные или права которого обрабатываются.
+
+    Возвращает:
+        Результат выполнения операции (тип: RedirectResponse).
+    """
     form_data = await request.form()
     verify_csrf(request, form_data.get("csrf_token"))
 
@@ -533,6 +698,11 @@ async def client_disable(
 
 @lru_cache(maxsize=1)
 def _all_event_types() -> tuple[str, ...]:
+    """Возвращает список известных типов событий аудита.
+
+    Возвращает:
+        Результат выполнения операции (тип: tuple[str, ...]).
+    """
     types: set[str] = set()
     for name in dir(_ev):
         cls = getattr(_ev, name)
@@ -547,6 +717,15 @@ def _all_event_types() -> tuple[str, ...]:
     return tuple(sorted(types))
 
 def _parse_date(value: str | None, *, end_of_day: bool = False) -> datetime | None:
+    """Разбирает дату из строки фильтра и нормализует её для запроса.
+
+    Параметры:
+        value (str | None): значение для обработки.
+        end_of_day (bool): если True, устанавливает время разобранной даты на конец дня..
+
+    Возвращает:
+        Результат выполнения операции (тип: datetime | None).
+    """
     if not value:
         return None
     try:
@@ -566,6 +745,19 @@ def _audit_query(
         date_from: datetime | None,
         date_to: datetime | None,
 ):
+    """Строит запрос к базе данных для выбранных фильтров событий аудита.
+
+    Параметры:
+        db (Session): сессия базы данных для чтения и сохранения данных.
+        event_type (str | None): тип события аудита.
+        actor_id (int | None): идентификатор пользователя, выполнившего действие.
+        ip (str | None): IP-адрес клиента.
+        date_from (datetime | None): начальная дата диапазона фильтра.
+        date_to (datetime | None): конечная дата диапазона фильтра.
+
+    Возвращает:
+        SQLAlchemy-запрос к таблице событий аудита (тип: Select).
+    """
     stmt = select(AuditEvent).order_by(AuditEvent.created_at.desc())
     if event_type:
         stmt = stmt.where(AuditEvent.event_type == event_type)
@@ -586,6 +778,18 @@ def _normalize_filters(
         date_from: str | None,
         date_to: str | None,
 ) -> dict:
+    """Проверяет и нормализует фильтры событий аудита.
+
+    Параметры:
+        event_type (str | None): тип события аудита.
+        actor_id (str | None): идентификатор пользователя, выполнившего действие.
+        ip (str | None): IP-адрес клиента.
+        date_from (str | None): начальная дата диапазона фильтра.
+        date_to (str | None): конечная дата диапазона фильтра.
+
+    Возвращает:
+        Результат выполнения операции (тип: dict).
+    """
     actor_id_int: int | None = None
     if actor_id:
         try:
@@ -613,6 +817,22 @@ def audit_list(
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_web),
 ):
+    """Формирует страницу событий аудита и ссылки с текущими фильтрами.
+
+    Параметры:
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+        event_type (str | None): тип события аудита.
+        actor_id (str | None): идентификатор пользователя, выполнившего действие.
+        ip (str | None): IP-адрес клиента.
+        date_from (str | None): начальная дата диапазона фильтра.
+        date_to (str | None): конечная дата диапазона фильтра.
+        page (int): номер страницы списка.
+        db (Session): сессия базы данных для чтения и сохранения данных.
+        user (User): пользователь, данные или права которого обрабатываются.
+
+    Возвращает:
+        Результат выполнения операции (тип: TemplateResponse | object).
+    """
     f = _normalize_filters(event_type, actor_id, ip, date_from, date_to)
 
     base = _audit_query(db, **f)
@@ -626,6 +846,11 @@ def audit_list(
     ).scalars().all()
 
     def build_qs() -> str:
+        """Формирует строку параметров URL из переданных фильтров.
+
+        Возвращает:
+            Результат выполнения операции (тип: str).
+        """
         parts: list[str] = []
         if f["event_type"]:
             parts.append(f"event_type={f['event_type']}")
@@ -667,10 +892,29 @@ def audit_export_csv(
     db: Session = Depends(get_db),
     user: User = Depends(require_admin_web),
 ):
+    """Формирует потоковый CSV-ответ с выбранными событиями аудита.
+
+    Параметры:
+        event_type (str | None): тип события аудита.
+        actor_id (str | None): идентификатор пользователя, выполнившего действие.
+        ip (str | None): IP-адрес клиента.
+        date_from (str | None): начальная дата диапазона фильтра.
+        date_to (str | None): конечная дата диапазона фильтра.
+        db (Session): сессия базы данных для чтения и сохранения данных.
+        user (User): пользователь, данные или права которого обрабатываются.
+
+    Возвращает:
+        Результат выполнения операции (тип: StreamingResponse).
+    """
     f = _normalize_filters(event_type, actor_id, ip, date_from, date_to)
     stmt = _audit_query(db, **f)
 
     def generate():
+        """Формирует строки CSV-выгрузки событий аудита.
+
+        Возвращает:
+            Генератор фрагментов CSV-строки (тип: Generator[str, None, None]).
+        """
         buf = io.StringIO()
         writer = csv.writer(buf)
         writer.writerow(

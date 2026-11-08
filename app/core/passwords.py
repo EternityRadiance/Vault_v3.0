@@ -18,6 +18,14 @@ _hasher = PasswordHasher(
 
 def hash_password(password: str) -> str:
 
+    """Хеширует пароль с добавлением pepper приложения.
+
+    Параметры:
+        password (str): пароль пользователя.
+
+    Возвращает:
+        Результат выполнения операции (тип: str).
+    """
     if not isinstance(password, str) or not password:
         raise WeakPasswordError("Пароль не может быть пустым.")
 
@@ -25,6 +33,15 @@ def hash_password(password: str) -> str:
     return _hasher.hash(peppered)
 
 def verify_password(password: str, hashed: str) -> bool:
+    """Сверяет пароль с сохранённым хешем.
+
+    Параметры:
+        password (str): пароль пользователя.
+        hashed (str): сохраненный хеш пароля для сравнения.
+
+    Возвращает:
+        Результат выполнения операции (тип: bool).
+    """
     if not password or not hashed:
         return False
 
@@ -36,6 +53,15 @@ def verify_password(password: str, hashed: str) -> bool:
         return False
 
 def validate_policy(password: str, user_inputs: list[str] | None = None) -> None:
+    """Проверяет длину и стойкость пароля с учётом пользовательских данных.
+
+    Параметры:
+        password (str): пароль пользователя.
+        user_inputs (list[str] | None): список значений для оценки стойкости пароля.
+
+    Возвращает:
+        None (значение не возвращается).
+    """
     if not isinstance(password, str) or not password:
         raise WeakPasswordError("Пароль не может быть пустым.")
 

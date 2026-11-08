@@ -25,6 +25,19 @@ def handle_password_grant(
         password: str | None,
         scope: str | None,
 ) -> dict:
+    """Проверяет учетные данные пользователя и выдает токены в рамках password grant.
+
+    Параметры:
+        db (Session): сессия базы данных для чтения и сохранения данных.
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+        client (OAuthClient): OAuth-клиент, для которого выполняется операция.
+        username (str | None): имя пользователя для аутентификации.
+        password (str | None): пароль пользователя.
+        scope (str | None): строка запрошенных OAuth-разрешений.
+
+    Возвращает:
+        Результат выполнения операции (тип: dict).
+    """
     if not username or not password:
         oauth_json_error(INVALID_GRANT, "username and password are required")
 

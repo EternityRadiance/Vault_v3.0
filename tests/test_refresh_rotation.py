@@ -4,7 +4,6 @@ from sqlalchemy.orm import Session
 
 from app.models.audit_event import AuditEvent
 from app.models.oauth_client import OAuthClient
-from app.models.refresh_token import RefreshToken
 
 
 class TestRefreshRotation:

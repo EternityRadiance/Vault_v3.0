@@ -10,6 +10,11 @@ from app.db.session import SessionLocal
 from app.models.user import User
 
 def main() -> int:
+    """Запускает основную операцию сценария командной строки.
+
+    Возвращает:
+        Результат выполнения операции (тип: int).
+    """
     if len(sys.argv) < 2:
         print("Usage: python scripts/make_admin.py <email>", file=sys.stderr)
         return 1

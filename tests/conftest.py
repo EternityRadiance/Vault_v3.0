@@ -7,7 +7,6 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from uuid import uuid4
 
-from app.config import settings
 from app.core.jwt import create_access_token
 from app.core.passwords import hash_password
 from app.db.base import Base

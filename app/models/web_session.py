@@ -5,6 +5,11 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.db.base import Base
 
 def _utcnow() -> datetime:
+    """Возвращает текущее время в UTC без часового пояса.
+
+    Возвращает:
+        Результат выполнения операции (тип: datetime).
+    """
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 class WebSession(Base):
@@ -30,6 +35,14 @@ class WebSession(Base):
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     def __repr__(self) -> str:
+        """Формирует строковое представление объекта для отладки.
+
+        Параметры:
+            self (WebSession): экземпляр класса WebSession, переданный Python.
+
+        Возвращает:
+            Результат выполнения операции (тип: str).
+        """
         return (
             f"<WebSession id={self.session_id!r} user_id={self.user_id} "
             f"revoked={self.revoked_at is not None}>"

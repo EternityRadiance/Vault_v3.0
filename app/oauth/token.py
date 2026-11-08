@@ -27,6 +27,25 @@ def token(
     refresh_token_value: str | None = Form(default=None, alias="refresh_token"),
     db: Session = Depends(get_db),
 ) -> dict:
+    """Обрабатывает запрос выдачи токена и вызывает обработчик указанного grant type.
+
+    Параметры:
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+        grant_type (str): тип OAuth grant из запроса.
+        client_id (str | None): идентификатор OAuth-клиента.
+        client_secret (str | None): секрет OAuth-клиента.
+        scope (str | None): строка запрошенных OAuth-разрешений.
+        username (str | None): имя пользователя для аутентификации.
+        password (str | None): пароль пользователя.
+        code (str | None): authorization code для обмена.
+        redirect_uri (str | None): адрес возврата OAuth-клиента.
+        code_verifier (str | None): PKCE code verifier, полученный от клиента.
+        refresh_token_value (str | None): значение refresh token из запроса.
+        db (Session): сессия базы данных для чтения и сохранения данных.
+
+    Возвращает:
+        Результат выполнения операции (тип: dict).
+    """
     client = authenticate_client(db, request, client_id, client_secret)
 
     if grant_type == "password":

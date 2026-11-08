@@ -1,6 +1,6 @@
 from __future__ import annotations
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, Form, Request, status
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
@@ -31,11 +31,25 @@ router = APIRouter(prefix="/web", tags=["web"])
 
 
 def _utcnow() -> datetime:
+    """Возвращает текущее время в UTC без часового пояса.
+
+    Возвращает:
+        Результат выполнения операции (тип: datetime).
+    """
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 @router.get("/")
 def index(request: Request, db: Session = Depends(get_db)):
+    """Показывает главную страницу или перенаправляет пользователя в зависимости от состояния его сессии.
+
+    Параметры:
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+        db (Session): сессия базы данных для чтения и сохранения данных.
+
+    Возвращает:
+        Результат выполнения операции (тип: RedirectResponse).
+    """
     user = get_web_user(db, request)
     if user is None:
         return RedirectResponse("/web/login", status_code=303)
@@ -44,6 +58,15 @@ def index(request: Request, db: Session = Depends(get_db)):
 
 @router.get("/login")
 def login_page(request: Request, next: str | None = None):
+    """Формирует страницу входа с учетом целевого адреса после аутентификации.
+
+    Параметры:
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+        next (str | None): адрес перенаправления после операции.
+
+    Возвращает:
+        Результат выполнения операции (тип: TemplateResponse).
+    """
     return render(
         request,
         "auth/login.html",
@@ -56,6 +79,15 @@ async def login_submit(
     request: Request,
     db: Session = Depends(get_db),
 ):
+    """Проверяет данные входа, создает веб-сессию и перенаправляет пользователя.
+
+    Параметры:
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+        db (Session): сессия базы данных для чтения и сохранения данных.
+
+    Возвращает:
+        Результат выполнения операции (тип: RedirectResponse | TemplateResponse).
+    """
     form_data = await request.form()
     verify_csrf(request, form_data.get("csrf_token"))
 
@@ -102,6 +134,14 @@ async def login_submit(
 
 @router.get("/register")
 def register_page(request: Request):
+    """Формирует страницу регистрации пользователя.
+
+    Параметры:
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+
+    Возвращает:
+        Результат выполнения операции (тип: TemplateResponse).
+    """
     return render(request, "auth/register.html")
 
 
@@ -110,6 +150,15 @@ async def register_submit(
     request: Request,
     db: Session = Depends(get_db),
 ):
+    """Обрабатывает регистрацию и отображает результат или ошибки формы.
+
+    Параметры:
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+        db (Session): сессия базы данных для чтения и сохранения данных.
+
+    Возвращает:
+        Результат выполнения операции (тип: RedirectResponse | TemplateResponse).
+    """
     form_data = await request.form()
     verify_csrf(request, form_data.get("csrf_token"))
 
@@ -164,6 +213,15 @@ async def logout_submit(
     request: Request,
     db: Session = Depends(get_db),
 ):
+    """Завершает текущую веб-сессию и перенаправляет пользователя на страницу входа.
+
+    Параметры:
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+        db (Session): сессия базы данных для чтения и сохранения данных.
+
+    Возвращает:
+        Результат выполнения операции (тип: RedirectResponse).
+    """
     form_data = await request.form()
     verify_csrf(request, form_data.get("csrf_token"))
 
@@ -190,6 +248,16 @@ def account_page(
     db: Session = Depends(get_db),
     user: User = Depends(require_web_user),
 ):
+    """Формирует страницу профиля текущего пользователя.
+
+    Параметры:
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+        db (Session): сессия базы данных для чтения и сохранения данных.
+        user (User): пользователь, данные или права которого обрабатываются.
+
+    Возвращает:
+        Результат выполнения операции (тип: TemplateResponse).
+    """
     return render(request, "account/profile.html", current_user=user)
 
 
@@ -199,6 +267,16 @@ def account_sessions_page(
     db: Session = Depends(get_db),
     user: User = Depends(require_web_user),
 ):
+    """Формирует страницу веб-сессий текущего пользователя.
+
+    Параметры:
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+        db (Session): сессия базы данных для чтения и сохранения данных.
+        user (User): пользователь, данные или права которого обрабатываются.
+
+    Возвращает:
+        Результат выполнения операции (тип: TemplateResponse).
+    """
     sessions = db.execute(
         select(WebSession)
         .where(WebSession.user_id == user.id)
@@ -223,6 +301,17 @@ async def account_session_revoke(
     db: Session = Depends(get_db),
     user: User = Depends(require_web_user),
 ):
+    """Отзывает выбранную веб-сессию текущего пользователя.
+
+    Параметры:
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+        session_id (str): идентификатор пользовательской сессии.
+        db (Session): сессия базы данных для чтения и сохранения данных.
+        user (User): пользователь, данные или права которого обрабатываются.
+
+    Возвращает:
+        Результат выполнения операции (тип: RedirectResponse).
+    """
     form_data = await request.form()
     verify_csrf(request, form_data.get("csrf_token"))
 
@@ -257,6 +346,16 @@ def account_security_page(
     db: Session = Depends(get_db),
     user: User = Depends(require_web_user),
 ):
+    """Формирует страницу настроек безопасности текущего пользователя.
+
+    Параметры:
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+        db (Session): сессия базы данных для чтения и сохранения данных.
+        user (User): пользователь, данные или права которого обрабатываются.
+
+    Возвращает:
+        Результат выполнения операции (тип: TemplateResponse).
+    """
     return render(
         request,
         "account/security.html",
@@ -270,6 +369,16 @@ async def account_security_submit(
     db: Session = Depends(get_db),
     user: User = Depends(require_web_user),
 ):
+    """Обрабатывает изменение настроек безопасности пользователя.
+
+    Параметры:
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+        db (Session): сессия базы данных для чтения и сохранения данных.
+        user (User): пользователь, данные или права которого обрабатываются.
+
+    Возвращает:
+        Результат выполнения операции (тип: RedirectResponse | TemplateResponse).
+    """
     form_data = await request.form()
     verify_csrf(request, form_data.get("csrf_token"))
 

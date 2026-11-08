@@ -5,6 +5,14 @@ from user_agents import parse
 
 
 def datetime_format(value: datetime | None) -> str:
+    """Форматирует дату или время для отображения в веб-интерфейсе.
+
+    Параметры:
+        value (datetime | None): значение для обработки.
+
+    Возвращает:
+        Результат выполнения операции (тип: str).
+    """
     if value is None:
         return "-"
 
@@ -16,6 +24,14 @@ def datetime_format(value: datetime | None) -> str:
 
 
 def humanize(value: datetime | None) -> str:
+    """Преобразует техническое значение в удобное для отображения представление.
+
+    Параметры:
+        value (datetime | None): значение для обработки.
+
+    Возвращает:
+        Результат выполнения операции (тип: str).
+    """
     if value is None:
         return "-"
 
@@ -40,6 +56,14 @@ def humanize(value: datetime | None) -> str:
 
 
 def mask_secret(value: str | None) -> str:
+    """Скрывает большую часть секрета для безопасного отображения.
+
+    Параметры:
+        value (str | None): значение для обработки.
+
+    Возвращает:
+        Результат выполнения операции (тип: str).
+    """
     if not value:
         return "-"
     if len(value) <= 10:
@@ -48,6 +72,14 @@ def mask_secret(value: str | None) -> str:
 
 
 def short_id(value: str | None) -> str:
+    """Сокращает идентификатор для компактного отображения.
+
+    Параметры:
+        value (str | None): значение для обработки.
+
+    Возвращает:
+        Результат выполнения операции (тип: str).
+    """
     if not value:
         return "-"
     if len(value) <= 12:
@@ -56,9 +88,13 @@ def short_id(value: str | None) -> str:
 
 
 def ua_humanize(value: str | None) -> str:
-    """
-    'Mozilla/5.0 (X11; Linux x86_64; rv:158.0)...' → 'Firefox 158.0 на Linux'.
-    Если не получилось распарсить — возвращает строку как есть.
+    """Формирует краткое читаемое описание браузера и операционной системы из User-Agent.
+
+    Параметры:
+        value (str | None): значение для обработки.
+
+    Возвращает:
+        Результат выполнения операции (тип: str).
     """
     if not value:
         return "-"
@@ -82,6 +118,14 @@ def ua_humanize(value: str | None) -> str:
 
 
 def register_filters(templates) -> None:
+    """Регистрирует пользовательские фильтры шаблонов в приложении.
+
+    Параметры:
+        templates: объект Jinja2Templates, в окружение которого регистрируются фильтры.
+
+    Возвращает:
+        None (значение не возвращается).
+    """
     templates.env.filters["datetime_format"] = datetime_format
     templates.env.filters["humanize"] = humanize
     templates.env.filters["mask_secret"] = mask_secret

@@ -13,6 +13,11 @@ PUBLIC_PATH = KEYS_DIR / "rsa_public.pem"
 KEY_SIZE = 2048
 
 def generate() -> None:
+    """Формирует строки CSV-выгрузки событий аудита.
+
+    Возвращает:
+        None (значение не возвращается).
+    """
     KEYS_DIR.mkdir(exist_ok=True)
 
     if PRIVATE_PATH.exists():

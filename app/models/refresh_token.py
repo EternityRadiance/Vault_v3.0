@@ -1,11 +1,16 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String
+from sqlalchemy import DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
 
 def _utcnow() -> datetime:
+    """Возвращает текущее время в UTC без часового пояса.
+
+    Возвращает:
+        Результат выполнения операции (тип: datetime).
+    """
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 class RefreshToken(Base):
@@ -36,6 +41,14 @@ class RefreshToken(Base):
     )
 
     def __repr__(self) -> str:
+        """Формирует строковое представление объекта для отладки.
+
+        Параметры:
+            self (RefreshToken): экземпляр класса RefreshToken, переданный Python.
+
+        Возвращает:
+            Результат выполнения операции (тип: str).
+        """
         return(
             f"<RefreshToken id={self.id} jti={self.jti!r} "
             f"family={self.family_id!r}>"

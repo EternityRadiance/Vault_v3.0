@@ -30,22 +30,49 @@ templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
 
 def _b64url(data: bytes) -> str:
+    """Кодирует байты в Base64 URL-safe без завершающего padding.
+
+    Параметры:
+        data (bytes): байты, которые кодируются в Base64 URL-safe..
+
+    Возвращает:
+        Результат выполнения операции (тип: str).
+    """
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
 
 
 def _gen_pkce() -> tuple[str, str]:
+    """Создаёт случайный PKCE verifier и соответствующий challenge.
+
+    Возвращает:
+        Результат выполнения операции (тип: tuple[str, str]).
+    """
     verifier = secrets.token_urlsafe(48)
     challenge = _b64url(hashlib.sha256(verifier.encode("ascii")).digest())
     return verifier, challenge
 
 
 def _get_jwks() -> dict:
+    """Получает набор публичных ключей сервера для проверки JWT.
+
+    Возвращает:
+        Результат выполнения операции (тип: dict).
+    """
     resp = httpx.get(f"{VAULT_URL}/.well-known/jwks.json", timeout=5)
     resp.raise_for_status()
     return resp.json()
 
 
 def _verify_id_token(id_token: str, nonce: str | None = None) -> dict:
+    """Проверяет подпись и claims OpenID Connect ID-токена.
+
+    Параметры:
+        id_token (str): OpenID Connect ID-токен, подпись и claims которого проверяются..
+        nonce (str | None): nonce запроса аутентификации.
+
+    Возвращает:
+        Результат выполнения операции (тип: dict).
+    """
     header = jwt.get_unverified_header(id_token)
     jwks = _get_jwks()
     key_data = next((k for k in jwks["keys"] if k["kid"] == header.get("kid")), None)
@@ -63,6 +90,14 @@ def _verify_id_token(id_token: str, nonce: str | None = None) -> dict:
 
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
+    """Показывает главную страницу или перенаправляет пользователя в зависимости от состояния его сессии.
+
+    Параметры:
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+
+    Возвращает:
+        HTML-страница или перенаправление (тип: TemplateResponse | RedirectResponse).
+    """
     access_token = request.cookies.get("access_token")
     id_token = request.cookies.get("id_token")
 
@@ -91,6 +126,14 @@ def index(request: Request):
 
 @app.get("/login")
 def login(request: Request):
+    """Начинает вход через OAuth-провайдера, создавая PKCE-параметры и устанавливая временные cookie.
+
+    Параметры:
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+
+    Возвращает:
+        Результат выполнения операции (тип: RedirectResponse).
+    """
     verifier, challenge = _gen_pkce()
     state = secrets.token_urlsafe(16)
     nonce = secrets.token_urlsafe(16)
@@ -116,6 +159,17 @@ def login(request: Request):
 
 @app.get("/callback")
 def callback(request: Request, code: str | None = None, state: str | None = None, error: str | None = None):
+    """Обрабатывает callback OAuth-провайдера и завершает обмен кода на токены.
+
+    Параметры:
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+        code (str | None): authorization code для обмена.
+        state (str | None): значение state для связывания запроса и ответа OAuth.
+        error (str | None): код OAuth-ошибки.
+
+    Возвращает:
+        Результат выполнения операции (тип: RedirectResponse).
+    """
     if error:
         raise HTTPException(400, f"OAuth error: {error}")
     if not code or not state:
@@ -167,6 +221,14 @@ def callback(request: Request, code: str | None = None, state: str | None = None
 
 @app.post("/logout")
 def logout(request: Request):
+    """Завершает сеанс демонстрационного приложения, отзывает refresh token и удаляет токенные cookie.
+
+    Параметры:
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+
+    Возвращает:
+        Результат выполнения операции (тип: RedirectResponse).
+    """
     refresh_token = request.cookies.get("refresh_token")
     if refresh_token:
         try:
@@ -187,6 +249,14 @@ def logout(request: Request):
 
 @app.get("/profile", response_class=HTMLResponse)
 def profile(request: Request):
+    """Формирует страницу профиля демонстрационного пользователя.
+
+    Параметры:
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+
+    Возвращает:
+        HTML-страница профиля или перенаправление (тип: TemplateResponse | RedirectResponse).
+    """
     access_token = request.cookies.get("access_token")
     id_token = request.cookies.get("id_token")
     if not access_token:

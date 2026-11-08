@@ -14,6 +14,16 @@ register_filters(templates)
 
 def render(request, template_name: str, **kwargs) -> "HTMLResponse":
 
+    """Рендерит HTML-шаблон с переданным контекстом и запросом.
+
+    Параметры:
+        request: HTTP-запрос, переданный веб-фреймворком.
+        template_name (str): путь или имя HTML-шаблона для рендеринга..
+        kwargs: аргументы поля GraphQL, переданные фреймворком.
+
+    Возвращает:
+        Результат выполнения операции (тип: 'HTMLResponse').
+    """
     from app.web.csrf import get_csrf_token
     from app.web.flash import pop_flashed_messages
 

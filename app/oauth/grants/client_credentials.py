@@ -16,6 +16,17 @@ def handle_client_credentials_grant(
         client: OAuthClient,
         scope: str | None,
 ) -> dict:
+    """Проверяет запрошенные scope и выдает токен для OAuth-клиента.
+
+    Параметры:
+        db (Session): сессия базы данных для чтения и сохранения данных.
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+        client (OAuthClient): OAuth-клиент, для которого выполняется операция.
+        scope (str | None): строка запрошенных OAuth-разрешений.
+
+    Возвращает:
+        Результат выполнения операции (тип: dict).
+    """
     if not client.is_confidential:
         oauth_json_error(
             UNAUTHORIZED_CLIENT,

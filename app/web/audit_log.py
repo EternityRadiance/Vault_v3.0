@@ -18,6 +18,21 @@ def list_audit_events(
         limit: int = PAGE_SIZE,
         offset: int = 0,
 ) -> list[AuditEvent]:
+    """Загружает и фильтрует записи аудита для административного интерфейса.
+
+    Параметры:
+        db (Session): сессия базы данных для чтения и сохранения данных.
+        actor_id (int | None): идентификатор пользователя, выполнившего действие.
+        event_type (str | None): тип события аудита.
+        ip (str | None): IP-адрес клиента.
+        date_from (datetime | None): начальная дата диапазона фильтра.
+        date_to (datetime | None): конечная дата диапазона фильтра.
+        limit (int): максимальное количество возвращаемых записей.
+        offset (int): число пропускаемых записей при пагинации.
+
+    Возвращает:
+        Результат выполнения операции (тип: list[AuditEvent]).
+    """
     stmt = select(AuditEvent).order_by(AuditEvent.created_at.desc())
     if actor_id is not None:
         stmt = stmt.where(AuditEvent.actor_id == actor_id)

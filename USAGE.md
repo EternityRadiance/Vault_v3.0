@@ -1,201 +1,211 @@
-# Vault - инструкция по использованию OAuth2/OIDC
+# Запуск и использование Vault
 
-## Подготовка
-Сервер запущен:
+Практические инструкции для локальной разработки и тестовых интеграций.
+Краткий обзор проекта находится в [README.md](README.md), устройство компонентов
+и OAuth-потока — в [ARCHITECTURE.md](ARCHITECTURE.md).
+
+## 1. Подготовить окружение
+
+Установите зависимости в виртуальное окружение:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+```
+
+Запустите PostgreSQL и Redis. Значения подключения должны соответствовать
+`DATABASE_URL` и `REDIS_URL`. Для локальной разработки не открывайте Redis и базу
+данных в недоверенную сеть.
+
+Создайте в корне проекта файл `.env` со следующими обязательными значениями:
+
+```dotenv
+DATABASE_URL=postgresql+psycopg2://vault:<DB_PASSWORD>@127.0.0.1:5432/vault_db
+PASSWORD_PEPPER=<случайное_значение_не_короче_32_символов>
+SESSION_SECRET=<отдельное_случайное_значение_не_короче_32_символов>
+```
+
+Все значения в угловых скобках — заполнители: замените их своими значениями,
+не копируйте буквально. Сгенерируйте `PASSWORD_PEPPER` и `SESSION_SECRET`
+независимо друг от друга командой:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+Не добавляйте `.env` в git и не передавайте реальные секреты через сообщения,
+логи или снимки экрана. Остальные параметры конфигурации, включая `REDIS_URL`,
+`ISSUER` и сроки действия, имеют значения по умолчанию; полный список приведён
+в [ARCHITECTURE.md](ARCHITECTURE.md).
+
+Создайте RSA-ключи и примените миграции:
+
+```bash
+python scripts/gen_keys.py
+alembic upgrade head
+```
+
+`keys/rsa_private.pem` — приватный ключ, необходимый для подписи токенов.
+Храните его с ограниченными правами доступа и не публикуйте. Запустите сервер:
 
 ```bash
 python run.py
 ```
 
-Проверка:
+По умолчанию он доступен только на `127.0.0.1:8000`. Проверьте состояние и
+документацию API:
 
 ```bash
-curl -s http://127.0.0.1:8000/health
-# {"status":"ok","app":"Vault"}
+curl http://127.0.0.1:8000/health
 ```
 
-Redis запущен:
+Swagger UI: `http://127.0.0.1:8000/docs`.
+
+## 2. Зарегистрировать пользователя и администратора
+
+Создать пользователя можно через SSR-форму `/web/register` или REST API:
 
 ```bash
-docker exec vault-redis redis-cli ping
-# PONG
+curl -X POST http://127.0.0.1:8000/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"<USER_EMAIL>","password":"<STRONG_USER_PASSWORD>"}'
 ```
 
-## Назначение админа
-Если admin@example.com не админ:
+Поля в примере — заполнители, не реальные учётные данные. Для локального
+ручного тестирования замените их; не используйте рабочие пароли в командной
+строке или истории оболочки.
+
+После регистрации назначить пользователю права администратора можно локально
+на машине с настроенным `.env`:
 
 ```bash
-python scripts/make_admin.py admin@example.com
+python scripts/make_admin.py <USER_EMAIL>
 ```
 
-## Регистрация OAuth-клиента
-Через GraphQL (нужен токен админа):
+Скрипт меняет запись в базе данных; передавайте адрес уже зарегистрированного
+пользователя.
+
+## 3. Создать OAuth-клиента
+
+Администратор может создать клиента в `/web/admin/clients/new` или через
+GraphQL mutation `createClient`. Для GraphQL используйте Bearer access-токен
+администратора, полученный через `POST /auth/login`. Не публикуйте этот токен.
+GraphQL endpoint — `/graphql/`.
+
+Поля клиента включают `name`, `isConfidential`, `scopes`, `grantTypes` и
+`redirectUris`. Разрешены scopes `openid`, `profile`, `email`,
+`offline_access`; grant types: `authorization_code`, `refresh_token`, `password`,
+`client_credentials`. Для `authorization_code` задайте callback URL. В
+разработке URI должен в точности совпадать с передаваемым `redirect_uri`.
+
+Mutation возвращает `clientId` и для конфиденциального клиента — `clientSecret`.
+Сохраните секрет безопасно в момент создания: повторно показать его нельзя.
+Публичный клиент не имеет секрета; для него используйте PKCE. Идентификатор
+`clientId` из результата — это значение `client_id` для OAuth-запросов.
+
+## 4. Пройти Authorization Code с PKCE
+
+Этот поток выполняется через браузер, поскольку `/oauth/authorize` использует
+веб-сессию Vault. Войдите в Vault, затем откройте URL авторизации с параметрами:
+
+```text
+http://127.0.0.1:8000/oauth/authorize?response_type=code&client_id=<CLIENT_ID>&redirect_uri=<URL_ENCODED_REGISTERED_REDIRECT_URI>&scope=openid%20email&state=<RANDOM_STATE>&code_challenge=<PKCE_S256_CHALLENGE>&code_challenge_method=S256
+```
+
+Замените каждый `<...>` заполнителем, сгенерированным для вашей локальной
+регистрации/сессии. `state` должен быть случайным и проверяться клиентом при
+callback. Создайте случайный PKCE `code_verifier` и передайте его приложению
+клиента; `code_challenge` должен быть Base64URL(SHA-256(`code_verifier`).
+Сохраняйте verifier и state на стороне клиента до callback.
+
+После входа и подтверждения согласия Vault перенаправит браузер на
+зарегистрированный callback с `code` и исходным `state`. Клиент должен сверить
+`state`, а затем обменять код:
 
 ```bash
-ADMIN_TOKEN=$(curl -s -X POST http://127.0.0.1:8000/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"admin@example.com","password":"Very strong admin password"}' \
-  | python -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
-
-curl -s -X POST "http://127.0.0.1:8000/graphql/" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer ${ADMIN_TOKEN}" \
-  -d '{"query":"mutation { createClient(name: \"My App\", isConfidential: true, scopes: [\"openid\", \"email\"], grantTypes: [\"authorization_code\", \"refresh_token\", \"password\"], redirectUris: [\"http://localhost/cb\"]) { clientId clientSecret } }"}' \
-  | python -m json.tool
+curl -X POST http://127.0.0.1:8000/oauth/token \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  --data-urlencode 'grant_type=authorization_code' \
+  --data-urlencode 'client_id=<CLIENT_ID>' \
+  --data-urlencode 'code=<AUTHORIZATION_CODE>' \
+  --data-urlencode 'redirect_uri=<REGISTERED_REDIRECT_URI>' \
+  --data-urlencode 'code_verifier=<ORIGINAL_PKCE_VERIFIER>'
 ```
 
-Запомни clientID (внутренний) и clientSecret - они показываются один раз.
+Для конфиденциального клиента дополнительно передайте `client_secret` через
+`--data-urlencode`, либо используйте настроенную HTTP Basic-аутентификацию
+клиента. Для публичного клиента секрета нет. Код одноразовый и действует
+ограниченное время; неверный verifier или повторный обмен завершается ошибкой.
 
-client_id (hex) - возьми из БД:
+## 5. Другие grant types и OIDC endpoints
+
+### `client_credentials`
+
+Только для конфиденциального клиента. Параметры передаются как
+`application/x-www-form-urlencoded` на `POST /oauth/token`:
+
+```text
+grant_type=client_credentials
+client_id=<CLIENT_ID>
+client_secret=<CLIENT_SECRET>
+scope=<SPACE_SEPARATED_SCOPES>
+```
+
+Секрет включён здесь только как явно обозначенный заполнитель. Этот поток не
+аутентифицирует пользователя; токен не следует интерпретировать как пользовательский.
+
+### `password`
+
+Устаревший grant для учебной совместимости: передаются `grant_type=password`,
+`client_id`, `username`, `password` и необязательный `scope`; конфиденциальный
+клиент также передаёт `client_secret`. Для новых интеграций используйте
+Authorization Code с PKCE.
+
+### `refresh_token`
+
+Передайте `grant_type=refresh_token`, `client_id`, `refresh_token` и, для
+конфиденциального клиента, `client_secret`. При успешном обмене сервер возвращает
+новый refresh-токен. Использованный токен нельзя применять повторно: повтор
+запускает обнаружение повторного использования и отзыв соответствующего семейства.
+
+### UserInfo, отзыв и интроспекция
+
+- `GET /oauth/userinfo` — отправьте `Authorization: Bearer <ACCESS_TOKEN>`.
+  Ответ зависит от scopes; endpoint предназначен для пользовательского токена.
+- `POST /oauth/revoke` — передайте `token`, необязательный
+  `token_type_hint`, `client_id` и секрет конфиденциального клиента. Endpoint
+  отвечает без раскрытия, был ли токен активен.
+- `POST /oauth/introspect` — передайте те же параметры, чтобы получить состояние
+  токена. В текущей реализации активность токена раскрывается только
+  аутентифицированному конфиденциальному клиенту; публичный клиент получает
+  `{"active": false}`. Для обоих POST используется
+  `Content-Type: application/x-www-form-urlencoded`.
+- `GET /.well-known/openid-configuration` и
+  `GET /.well-known/jwks.json` публикуют OIDC Discovery и открытые ключи.
+
+Не вставляйте настоящие токены или секреты в примеры, общие терминалы, CI-логи
+или документацию.
+
+## 6. Веб-интерфейс и тестирование
+
+- `/web/login`, `/web/register` — вход и регистрация.
+- `/web/account`, `/web/account/sessions`, `/web/account/security` — кабинет,
+  активные веб-сессии и смена пароля.
+- `/web/consent` — подтверждение или отказ в запрошенном доступе OAuth.
+- `/web/admin` — административная панель; для доступа требуется роль администратора.
+- `/graphql/` — API; административные поля требуют Bearer-токен администратора.
+
+Формы, изменяющие состояние, защищены CSRF-проверкой. Не отключайте её для
+удобства тестирования.
+
+Запустить тестовый набор:
 
 ```bash
-PGPASSWORD=<password> psql -h 127.0.0.1 -U vault -d vault_db \
-  -c "SELECT id, client_id, name FROM oauth_clients WHERE name = 'My App';"
+pytest
 ```
 
-## Grant 'password'
-
-Прямой обмен 'username' + 'password' на токены.
-
-```bash
-curl -s -X POST "http://127.0.0.1:8000/oauth/token" \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  --data-urlencode "grant_type=password" \
-  --data-urlencode "client_id=<client_id hex>" \
-  --data-urlencode "client_secret=<client_secret>" \
-  --data-urlencode "username=oauth-test@example.com" \
-  --data-urlencode "password=some long password 12345" \
-  --data-urlencode "scope=openid email" \
-  | python -m json.tool
-```
-Ответ: access_token, refresh_token, id_token, expires_in, token_type, scope.
-
-## Grant client_credentials
-
-Только для конфиденциальных клиентов. Без refresh, без id_token.
-
-```bash
-curl -s -X POST "http://127.0.0.1:8000/oauth/token" \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  --data-urlencode "grant_type=client_credentials" \
-  --data-urlencode "client_id=<hex>" \
-  --data-urlencode "client_secret=<secret>" \
-  --data-urlencode "scope=openid" \
-  | python -m json.tool
-```
-
-sub = client_id (не user.id).
-
-## Grant `authorization_code` (с PKCE)
-
-### Шаг 1 — получить `code`
-
-```bash
-USER_TOKEN=$(curl -s -X POST http://127.0.0.1:8000/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"oauth-test@example.com","password":"some long password 12345"}' \
-  | python -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
-
-VERIFIER="dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
-CHALLENGE="E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
-
-RESP=$(curl -s -i "http://127.0.0.1:8000/oauth/authorize?response_type=code&client_id=<hex>&redirect_uri=http://localhost/cb&scope=openid%20email&state=xyz&code_challenge=${CHALLENGE}&code_challenge_method=S256" \
-  -H "Authorization: Bearer ${USER_TOKEN}")
-
-CODE=$(echo "$RESP" | grep -i "^location:" | sed 's/.*code=\([^&]*\).*/\1/' | tr -d '\r\n ')
-echo "CODE: $CODE"
-```
-
-### Шаг 2 — обменять code на токены
-
-```bash
-curl -s -X POST "http://127.0.0.1:8000/oauth/token" \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  --data-urlencode "grant_type=authorization_code" \
-  --data-urlencode "client_id=<hex>" \
-  --data-urlencode "code=${CODE}" \
-  --data-urlencode "redirect_uri=http://localhost/cb" \
-  --data-urlencode "code_verifier=${VERIFIER}" \
-  | python -m json.tool
-```
-
-Повторный обмен с тем же code выдаст 400 invalid_grant + аудит auth_code.reuse_detected.
-
-Неверный code_verifier выдаст 400 PKCE verification failed.
-
-## Grant refresh_token (rotation)
-
-```bash
-RT1="<refresh_token из предыдущего ответа>"
-
-RESP=$(curl -s -X POST "http://127.0.0.1:8000/oauth/token" \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  --data-urlencode "grant_type=refresh_token" \
-  --data-urlencode "client_id=<hex>" \
-  --data-urlencode "client_secret=<secret>" \
-  --data-urlencode "refresh_token=${RT1}")
-
-echo "$RESP" | python -m json.tool
-
-RT2=$(echo "$RESP" | python -c "import sys,json; print(json.load(sys.stdin)['refresh_token'])")
-```
-
-Reuse RT1 выдаст 400 refresh_token has already been used + отзыв всего семейства (RT1 и RT2). Аудит: token.reuse_detected.
-
-Попытка RT2 после reuse -> 400 has been revoked.
-
-## Отзыв и интроспекция
-
-### `/oauth/revoke`
-
-```bash
-curl -s -X POST "http://127.0.0.1:8000/oauth/revoke" \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  --data-urlencode "token=<access_token>" \
-  --data-urlencode "token_type_hint=access_token" \
-  --data-urlencode "client_id=<hex>" \
-  --data-urlencode "client_secret=<secret>"
-```
-
-Всегда 200 {}. Для access - jti в Redis blacklist. Для refresh - revoked_at в БД + UserSession.
-
-### '/oauth/introspect'
-
-```bash
-curl -s -X POST "http://127.0.0.1:8000/oauth/introspect" \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  --data-urlencode "token=<access_token>" \
-  --data-urlencode "token_type_hint=access_token" \
-  --data-urlencode "client_id=<hex>" \
-  --data-urlencode "client_secret=<secret>" \
-  | python -m json.tool
-```
-
-Активный токен: {"active": true, "sub": "...", "scope": "...", ...}.
-
-После revoke: {"active": false}.
-
-### OIDC '/oauth/userinfo'
-
-```bash
-curl -s "http://127.0.0.1:8000/oauth/userinfo" \
-  -H "Authorization: Bearer <access_token>" \
-  | python -m json.tool
-```
-
-1) scope openid: {"sub": "..."}.
-
-2) scope openid email: + "email", "email_verified".
-
-3) scope openid email profile: + "name", "preferred_username", "updated_at".
-
-4) Отозванный токен: 401 Token has been revoked.
-
-5) client_credentials токен: 401 Token is not associated with a user.
-
-## JWKS и Discovery
-
-```bash
-curl -s http://127.0.0.1:8000/.well-known/openid-configuration | python -m json.tool
-curl -s http://127.0.0.1:8000/.well-known/jwks.json | python -m json.tool
-```
+Проверка из `examples/check_oauth.py` предназначена для работающего экземпляра
+и предварительно настроенного OAuth-клиента. Для неё требуется отдельно
+подготовить регистрацию и конфигурацию; тестовые данные не являются
+производственными учётными данными.

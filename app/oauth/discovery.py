@@ -7,6 +7,11 @@ router = APIRouter(tags=["oauth"])
 
 @router.get("/.well-known/openid-configuration", include_in_schema=False)
 def get_openid_configuration() -> dict:
+    """Формирует документ обнаружения OpenID Connect с адресами и поддерживаемыми возможностями сервера.
+
+    Возвращает:
+        Результат выполнения операции (тип: dict).
+    """
     issuer = settings.issuer.rstrip("/")
 
     return {

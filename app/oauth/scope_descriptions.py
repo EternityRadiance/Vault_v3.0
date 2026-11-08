@@ -21,4 +21,12 @@ SCOPE_LABELS: dict[str, tuple[str, str]] = {
 }
 
 def describe_scope(scope: str) -> tuple[str, str]:
+    """Возвращает отображаемое название и описание OAuth scope.
+
+    Параметры:
+        scope (str): строка запрошенных OAuth-разрешений.
+
+    Возвращает:
+        Результат выполнения операции (тип: tuple[str, str]).
+    """
     return SCOPE_LABELS.get(scope, (scope, ""))

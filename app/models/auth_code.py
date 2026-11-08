@@ -1,11 +1,16 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String
+from sqlalchemy import DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
 
 def _utcnow() -> datetime:
+    """Возвращает текущее время в UTC без часового пояса.
+
+    Возвращает:
+        Результат выполнения операции (тип: datetime).
+    """
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 class AuthCode(Base):
@@ -38,6 +43,14 @@ class AuthCode(Base):
     )
 
     def __repr__(self) -> str:
+        """Формирует строковое представление объекта для отладки.
+
+        Параметры:
+            self (AuthCode): экземпляр класса AuthCode, переданный Python.
+
+        Возвращает:
+            Результат выполнения операции (тип: str).
+        """
         return (
             f"<AuthCode id={self.id} client_id={self.client_id!r} "
             f"used={self.used_at is not None}>"

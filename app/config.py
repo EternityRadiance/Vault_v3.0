@@ -36,10 +36,26 @@ class Settings(BaseSettings):
 
     @property
     def is_production(self) -> bool:
+        """Определяет, запущено ли приложение в производственном окружении.
+
+        Параметры:
+            self (Settings): экземпляр класса Settings, переданный Python.
+
+        Возвращает:
+            Результат выполнения операции (тип: bool).
+        """
         return self.environment.lower() == "production"
 
     @property
     def session_cookie_secure(self) -> bool:
+        """Определяет, следует ли устанавливать cookie с флагом Secure.
+
+        Параметры:
+            self (Settings): экземпляр класса Settings, переданный Python.
+
+        Возвращает:
+            Результат выполнения операции (тип: bool).
+        """
         return self.is_production
 
 settings = Settings()

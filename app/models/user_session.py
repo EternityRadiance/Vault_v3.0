@@ -1,11 +1,16 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String
+from sqlalchemy import DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
 
 def _utcnow() -> datetime:
+    """Возвращает текущее время в UTC без часового пояса.
+
+    Возвращает:
+        Результат выполнения операции (тип: datetime).
+    """
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 class UserSession(Base):
@@ -29,6 +34,14 @@ class UserSession(Base):
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     def __repr__(self) -> str:
+        """Формирует строковое представление объекта для отладки.
+
+        Параметры:
+            self (UserSession): экземпляр класса UserSession, переданный Python.
+
+        Возвращает:
+            Результат выполнения операции (тип: str).
+        """
         return (
             f"<UserSession id={self.id} user_id={self.user_id} "
             f"client_id={self.client_id!r} revoked={self.revoked_at is not None}>"

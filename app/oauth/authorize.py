@@ -1,7 +1,7 @@
 from __future__ import annotations
 import json
 import secrets
-from urllib.parse import quote, urlencode
+from urllib.parse import quote
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy import select
@@ -41,6 +41,23 @@ def authorize(
     nonce: str | None = Query(default=None),
     db: Session = Depends(get_db),
 ):
+    """Проверяет запрос OAuth-авторизации, сохраняет ожидающее согласие и перенаправляет пользователя на нужный этап.
+
+    Параметры:
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+        response_type (str): тип OAuth-ответа.
+        client_id (str): идентификатор OAuth-клиента.
+        redirect_uri (str): адрес возврата OAuth-клиента.
+        scope (str): строка запрошенных OAuth-разрешений.
+        state (str | None): значение state для связывания запроса и ответа OAuth.
+        code_challenge (str | None): сохранённый PKCE challenge.
+        code_challenge_method (str | None): метод вычисления PKCE challenge.
+        nonce (str | None): nonce запроса аутентификации.
+        db (Session): сессия базы данных для чтения и сохранения данных.
+
+    Возвращает:
+        Результат выполнения операции (тип: RedirectResponse).
+    """
     info = get_client_info(request)
 
     web_user = get_web_user(db, request)

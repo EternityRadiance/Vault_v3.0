@@ -1,5 +1,5 @@
 from __future__ import annotations
-from datetime import datetime, timezone
+from datetime import timezone
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from jose import JWTError, jwt
 from sqlalchemy import select
@@ -14,6 +14,15 @@ router = APIRouter(tags=["oauth"])
 
 @router.get("/oauth/userinfo", include_in_schema=False)
 def userinfo(request: Request, db: Session = Depends(get_db)) -> dict:
+    """Проверяет access token и возвращает разрешённые атрибуты пользователя.
+
+    Параметры:
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+        db (Session): сессия базы данных для чтения и сохранения данных.
+
+    Возвращает:
+        Результат выполнения операции (тип: dict).
+    """
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
         raise HTTPException(

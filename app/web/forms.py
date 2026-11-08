@@ -26,6 +26,15 @@ class ClientForm(BaseModel):
     redirect_uris: list[str] = Field(default_factory=list)
 
 def parse_form(form_class, data: dict) -> tuple[BaseModel | None, dict[str, list[str]]]:
+    """Разбирает данные формы запроса в отображение строковых значений.
+
+    Параметры:
+        form_class: класс Pydantic-модели для проверки и разбора формы.
+        data (dict): значения полей формы, проверяемые указанной Pydantic-моделью..
+
+    Возвращает:
+        Результат выполнения операции (тип: tuple[BaseModel | None, dict[str, list[str]]]).
+    """
     try:
         return form_class(**data), {}
     except ValidationError as e:
@@ -42,16 +51,40 @@ ALLOWED_GRANT_TYPES = frozenset(
 )
 
 def _split_space(value: str | None) -> list[str]:
+    """Разбивает строку по пробельным символам и удаляет пустые элементы.
+
+    Параметры:
+        value (str | None): значение для обработки.
+
+    Возвращает:
+        Результат выполнения операции (тип: list[str]).
+    """
     if not value:
         return []
     return [s for s in value.replace(",", " ").split() if s]
 
 def _split_lines(value: str | None) -> list[str]:
+    """Разбивает многострочное значение на непустые строки.
+
+    Параметры:
+        value (str | None): значение для обработки.
+
+    Возвращает:
+        Результат выполнения операции (тип: list[str]).
+    """
     if not value:
         return []
     return [line.strip() for line in value.splitlines() if line.strip()]
 
 def _is_valid_http_url(url: str) -> bool:
+    """Проверяет, что строка является корректным HTTP- или HTTPS-URL.
+
+    Параметры:
+        url (str): адрес для обработки.
+
+    Возвращает:
+        Результат выполнения операции (тип: bool).
+    """
     try:
         parsed = urlparse(url)
     except ValueError:
@@ -59,6 +92,14 @@ def _is_valid_http_url(url: str) -> bool:
     return parsed.scheme in ("http", "https") and bool(parsed.netloc)
 
 def parse_client_form(raw: dict) -> tuple[ClientForm | None, dict[str, list[str]]]:
+    """Проверяет и преобразует поля формы OAuth-клиента в нормализованные значения.
+
+    Параметры:
+        raw (dict): исходное значение.
+
+    Возвращает:
+        Результат выполнения операции (тип: tuple[ClientForm | None, dict[str, list[str]]]).
+    """
     errors: dict[str, list[str]] = {}
 
     data = {

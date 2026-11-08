@@ -9,7 +9,6 @@ from fastapi import Depends
 
 from app.audit.events import OAuthEvents
 from app.audit.service import get_client_info, write_event
-from app.config import settings
 from app.core.security.jwt_rsa import load_public_key
 from app.db.session import get_db
 from app.models.refresh_token import RefreshToken
@@ -21,9 +20,24 @@ from app.redis_client import blacklist_jti
 router = APIRouter(tags=["oauth"])
 
 def _utcnow() -> datetime:
+    """Возвращает текущее время в UTC без часового пояса.
+
+    Возвращает:
+        Результат выполнения операции (тип: datetime).
+    """
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 def _revoke_refresh_token(db: Session, raw_token: str, request: Request) -> None:
+    """Отзывает переданный refresh token и связанные с ним токены.
+
+    Параметры:
+        db (Session): сессия базы данных для чтения и сохранения данных.
+        raw_token (str): исходное значение токена до хеширования.
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+
+    Возвращает:
+        None (значение не возвращается).
+    """
     token_hash = sha256_hex(raw_token)
     rt = db.execute(
         select(RefreshToken).where(RefreshToken.token_hash == token_hash)
@@ -55,6 +69,16 @@ def _revoke_refresh_token(db: Session, raw_token: str, request: Request) -> None
         )
 
 def _revoke_access_token(raw_token: str, request: Request, db: Session) -> None:
+    """Добавляет access token в список отозванных до истечения срока действия.
+
+    Параметры:
+        raw_token (str): исходное значение токена до хеширования.
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+        db (Session): сессия базы данных для чтения и сохранения данных.
+
+    Возвращает:
+        None (значение не возвращается).
+    """
     try:
         payload = jwt.decode(
             raw_token,
@@ -94,6 +118,19 @@ def revoke(
     client_secret: str | None = Form(default=None),
     db: Session = Depends(get_db),
 ):
+    """Аутентифицирует клиента и отзывает указанный OAuth-токен.
+
+    Параметры:
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+        token (str): исходное значение токена.
+        token_type_hint (str | None): подсказка о типе токена из запроса.
+        client_id (str | None): идентификатор OAuth-клиента.
+        client_secret (str | None): секрет OAuth-клиента.
+        db (Session): сессия базы данных для чтения и сохранения данных.
+
+    Возвращает:
+        Результат выполнения операции (тип: JSONResponse).
+    """
     client = authenticate_client(db, request, client_id, client_secret)
 
     if token_type_hint == "refresh_token":

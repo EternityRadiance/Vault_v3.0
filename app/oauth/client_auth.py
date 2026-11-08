@@ -14,6 +14,17 @@ def authenticate_client(
         client_id: str | None,
         client_secret: str | None,
 ) -> OAuthClient:
+    """Аутентифицирует OAuth-клиента по переданным учетным данным.
+
+    Параметры:
+        db (Session): сессия базы данных для чтения и сохранения данных.
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+        client_id (str | None): идентификатор OAuth-клиента.
+        client_secret (str | None): секрет OAuth-клиента.
+
+    Возвращает:
+        Результат выполнения операции (тип: OAuthClient).
+    """
     if not client_id or not client_secret:
         auth_header = request.headers.get("Authorization", "")
         if auth_header.startswith("Basic "):

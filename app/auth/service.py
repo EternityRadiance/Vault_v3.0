@@ -6,7 +6,6 @@ from app.audit.events import UserEvents
 from app.audit.service import write_event, get_client_info
 from app.core.jwt import create_access_token
 from app.core.passwords import (
-    WeakPasswordError,
     hash_password,
     validate_policy,
     verify_password,
@@ -27,6 +26,17 @@ def register_user(
         request=None,
 ) -> tuple[User, str]:
 
+    """Создаёт пользователя после проверки email и пароля, записывает событие аудита и выдаёт токен доступа.
+
+    Параметры:
+        db (Session): сессия базы данных для чтения и сохранения данных.
+        email (str): адрес электронной почты пользователя.
+        password (str): пароль пользователя.
+        request: HTTP-запрос, переданный веб-фреймворком.
+
+    Возвращает:
+        Результат выполнения операции (тип: tuple[User, str]).
+    """
     email_norm = email.strip().lower()
 
     existing = db.execute(
@@ -67,6 +77,17 @@ def authenticate_user(
         request=None,
 ) -> tuple[User, str]:
 
+    """Проверяет учетные данные и активность пользователя, записывает результат входа и выдаёт токен доступа.
+
+    Параметры:
+        db (Session): сессия базы данных для чтения и сохранения данных.
+        email (str): адрес электронной почты пользователя.
+        password (str): пароль пользователя.
+        request: HTTP-запрос, переданный веб-фреймворком.
+
+    Возвращает:
+        Результат выполнения операции (тип: tuple[User, str]).
+    """
     email_norm = email.strip().lower()
 
     user = db.execute(

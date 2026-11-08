@@ -19,6 +19,11 @@ from app.oauth.errors import (
 from app.oauth.tokens import generate_refresh_token, issue_token_response, sha256_hex
 
 def _utcnow() -> datetime:
+    """Возвращает текущее время в UTC без часового пояса.
+
+    Возвращает:
+        Результат выполнения операции (тип: datetime).
+    """
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 def handle_authorization_code_grant(
@@ -30,6 +35,19 @@ def handle_authorization_code_grant(
         redirect_uri: str | None,
         code_verifier: str | None,
 ) -> dict:
+    """Проверяет authorization code, redirect URI и PKCE, затем обменивает код на токены.
+
+    Параметры:
+        db (Session): сессия базы данных для чтения и сохранения данных.
+        request (Request): HTTP-запрос, переданный веб-фреймворком.
+        client (OAuthClient): OAuth-клиент, для которого выполняется операция.
+        code (str | None): authorization code для обмена.
+        redirect_uri (str | None): адрес возврата OAuth-клиента.
+        code_verifier (str | None): PKCE code verifier, полученный от клиента.
+
+    Возвращает:
+        Результат выполнения операции (тип: dict).
+    """
     if not code:
         oauth_json_error(INVALID_REQUEST, "code is required")
     if not redirect_uri:
