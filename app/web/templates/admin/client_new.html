@@ -1,0 +1,46 @@
+{% extends "admin/base.html" %}
+{% from "_macros.html" import render_field %}
+
+{% block title %}Новый клиент — {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 640px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+        <h1 style="margin:0;">Новый OAuth-клиент</h1>
+        <a href="/web/admin/clients" class="btn btn--secondary">← К списку</a>
+    </div>
+
+    <form method="post" action="/web/admin/clients/new">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        {{ render_field("name", "Название", value=(form_data.name if form_data else ""), errors=errors.get("name") if errors else None, required=True) }}
+
+        <div class="form-field">
+            <label for="is_confidential">
+                <input type="checkbox" id="is_confidential" name="is_confidential"
+                       {% if not form_data or form_data.is_confidential %}checked{% endif %}>
+                Confidential (конфиденциальный)
+            </label>
+            <p class="text-muted" style="margin:0.25rem 0 0 0; font-size:0.8rem;">
+                Конфиденциальному клиенту будет сгенерирован client_secret.
+                Публичному — нет, ему обязателен PKCE.
+            </p>
+        </div>
+
+        {{ render_field("scopes", "Scopes (через пробел)", value=(form_data.scopes if form_data else "openid"), errors=errors.get("scopes") if errors else None, required=True) }}
+        {{ render_field("grant_types", "Grant types (через пробел)", value=(form_data.grant_types if form_data else "authorization_code refresh_token"), errors=errors.get("grant_types") if errors else None, required=True) }}
+
+        <div class="form-field">
+            <label for="redirect_uris">Redirect URIs (по одному на строку)</label>
+            <textarea id="redirect_uris" name="redirect_uris" rows="4"
+                      style="width:100%; padding:0.5rem; border:1px solid var(--border); border-radius:4px; font-family:ui-monospace,monospace;"
+                      class="{% if errors and errors.get('redirect_uris') %}input-error{% endif %}">{{ form_data.redirect_uris if form_data else '' }}</textarea>
+            {% if errors and errors.get("redirect_uris") %}
+                <ul class="field-errors">{% for err in errors.redirect_uris %}<li>{{ err }}</li>{% endfor %}</ul>
+            {% endif %}
+        </div>
+
+        <button type="submit" class="btn btn--primary">Создать</button>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,45 @@
+{% extends "admin/base.html" %}
+{% from "_macros.html" import render_badge %}
+
+{% block title %}OAuth-клиенты — {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+        <h1 style="margin:0;">OAuth-клиенты</h1>
+        <a href="/web/admin/clients/new" class="btn btn--primary">Создать клиента</a>
+    </div>
+
+    {% if clients %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Название</th>
+                <th>client_id</th>
+                <th>Confidential</th>
+                <th>Grant types</th>
+                <th>Активен</th>
+                <th>Создан</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in clients %}
+            <tr style="cursor:pointer;" onclick="window.location='/web/admin/clients/{{ c.id }}'">
+                <td>{{ c.id }}</td>
+                <td><strong>{{ c.name }}</strong></td>
+                <td><code>{{ c.client_id }}</code></td>
+                <td>{% if c.is_confidential %}{{ render_badge("да", "success") }}{% else %}{{ render_badge("нет", "default") }}{% endif %}</td>
+                <td><code>{{ c.grant_types | join(", ") }}</code></td>
+                <td>{% if c.is_active %}{{ render_badge("да", "success") }}{% else %}{{ render_badge("нет", "danger") }}{% endif %}</td>
+                <td>{{ c.created_at | datetime_format }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <p class="text-muted">Всего: {{ clients | length }}.</p>
+    {% else %}
+    <p class="text-muted">Клиентов пока нет.</p>
+    {% endif %}
+</div>
+{% endblock %}

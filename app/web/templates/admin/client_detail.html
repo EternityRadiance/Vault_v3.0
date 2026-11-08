@@ -1,0 +1,67 @@
+{% extends "admin/base.html" %}
+{% from "_macros.html" import render_badge %}
+
+{% block title %}{{ client.name }} — {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+        <h1 style="margin:0;">{{ client.name }}</h1>
+        <a href="/web/admin/clients" class="btn btn--secondary">← К списку</a>
+    </div>
+
+    <table class="table" style="max-width:700px;">
+        <tr><td>Внутренний ID</td><td>{{ client.id }}</td></tr>
+        <tr><td>client_id</td><td><code>{{ client.client_id }}</code></td></tr>
+        <tr>
+            <td>Confidential</td>
+            <td>{% if client.is_confidential %}{{ render_badge("да", "success") }}{% else %}{{ render_badge("нет", "default") }}{% endif %}</td>
+        </tr>
+        <tr>
+            <td>Секрет</td>
+            <td>{% if client.hashed_secret %}установлен{% else %}—{% endif %}</td>
+        </tr>
+        <tr>
+            <td>Активен</td>
+            <td>{% if client.is_active %}{{ render_badge("да", "success") }}{% else %}{{ render_badge("нет", "danger") }}{% endif %}</td>
+        </tr>
+        <tr><td>Scopes</td><td><code>{{ client.scopes | join(", ") }}</code></td></tr>
+        <tr><td>Grant types</td><td><code>{{ client.grant_types | join(", ") }}</code></td></tr>
+        <tr>
+            <td>Redirect URIs</td>
+            <td>
+                {% if client.redirect_uris %}
+                    <ul style="margin:0; padding-left:1.2rem;">
+                        {% for u in client.redirect_uris %}<li><code>{{ u }}</code></li>{% endfor %}
+                    </ul>
+                {% else %}—{% endif %}
+            </td>
+        </tr>
+        <tr><td>Создан</td><td>{{ client.created_at | datetime_format }}</td></tr>
+        <tr><td>Обновлён</td><td>{{ client.updated_at | datetime_format }}</td></tr>
+    </table>
+
+    <div style="margin-top:1.5rem; display:flex; gap:0.5rem; flex-wrap:wrap;">
+        {% if client.is_confidential %}
+        <form method="post" action="/web/admin/clients/{{ client.id }}/rotate-secret" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="btn btn--primary"
+                    onclick="return confirm('Ротировать секрет? Старый перестанет работать.')">Ротировать секрет</button>
+        </form>
+        {% endif %}
+
+        {% if client.is_active %}
+        <form method="post" action="/web/admin/clients/{{ client.id }}/disable" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="btn btn--danger"
+                    onclick="return confirm('Выключить клиента? Он перестанет принимать OAuth-запросы.')">Выключить</button>
+        </form>
+        {% else %}
+        <form method="post" action="/web/admin/clients/{{ client.id }}/enable" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="btn btn--primary">Включить</button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
