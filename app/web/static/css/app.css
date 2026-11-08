@@ -124,6 +124,20 @@ body {
     margin-bottom: 1rem;
 }
 
+.audit-filters {
+    grid-template-columns: minmax(0, 2fr) repeat(4, minmax(0, 1fr)) auto;
+}
+
+.audit-filters label {
+    min-width: 0;
+}
+
+.audit-filters input,
+.audit-filters select {
+    width: 100%;
+    min-width: 0;
+}
+
 .btn {
     display: inline-block;
     padding: 0.5rem 1rem;

@@ -10,8 +10,8 @@
         <a href="/web/admin" class="btn btn--secondary">← Дашборд</a>
     </div>
 
-    <form method="get" action="/web/admin/audit"
-          style="display:grid; grid-template-columns:2fr 1fr 1fr 1fr 1fr auto; gap:0.5rem; align-items:end; margin-bottom:1rem;">
+    <form method="get" action="/web/admin/audit" class="audit-filters"
+          style="display:grid; gap:0.5rem; align-items:end; margin-bottom:1rem;">
         <label style="display:flex; flex-direction:column; font-size:0.8rem; color:var(--muted);">
             Event type
             <select name="event_type" style="padding:0.5rem; border:1px solid var(--border); border-radius:4px;">
@@ -46,7 +46,7 @@
                    style="padding:0.5rem; border:1px solid var(--border); border-radius:4px;">
         </label>
 
-        <div style="display:flex; gap:0.5rem;">
+        <div class="audit-filters__actions" style="display:flex; gap:0.5rem;">
             <button type="submit" class="btn btn--primary">Фильтр</button>
             <a href="/web/admin/audit" class="btn btn--secondary">Сбросить</a>
         </div>
