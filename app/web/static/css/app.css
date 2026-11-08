@@ -239,3 +239,17 @@ body {
 h1, h2, h3 {
     margin-top: 0;
 }
+
+#theme-toggle {
+    font-size: 1.1rem;
+    line-height: 1;
+    padding: 0.25rem 0.5rem;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    color: var(--fg);
+    cursor: pointer;
+}
+#theme-toggle:hover {
+    border-color: var(--border);
+}
