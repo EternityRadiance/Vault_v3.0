@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}Согласие — {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 640px; margin: 2rem auto;">
+    <h1 style="margin-top: 0;">
+        Приложение <strong>{{ client.name }}</strong> запрашивает доступ
+    </h1>
+    <p class="text-muted">
+        Вы вошли как <strong>{{ current_user.email }}</strong>.<br>
+        Приложение <code>{{ client.client_id | short_id }}</code> хочет получить следующие права:
+    </p>
+
+    <ul style="padding-left: 1.2rem; margin: 1rem 0;">
+        {% for title, description in scope_details %}
+            <li style="margin-bottom: 0.75rem;">
+                <strong>{{ title }}</strong>
+                {% if description %}
+                    <br><span class="text-muted" style="font-size: 0.9rem;">{{ description }}</span>
+                {% endif %}
+            </li>
+        {% endfor %}
+    </ul>
+
+    <p class="text-muted" style="font-size: 0.85rem;">
+        После согласия вы будете перенаправлены обратно в приложение:
+        <code>{{ redirect_uri | short_id }}</code>
+    </p>
+
+    <form method="post" action="/web/consent"
+          style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="request_id" value="{{ request_id }}">
+        <button type="submit" name="decision" value="allow" class="btn btn--primary">
+            Разрешить
+        </button>
+        <button type="submit" name="decision" value="deny" class="btn btn--danger">
+            Отклонить
+        </button>
+    </form>
+</div>
+{% endblock %}

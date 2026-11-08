@@ -1,16 +1,24 @@
 from __future__ import annotations
+import re
+from urllib.parse import parse_qs, urlparse
 from fastapi.testclient import TestClient
-from urllib.parse import urlparse, parse_qs
 
 from app.models.oauth_client import OAuthClient
 
+def _extract_csrf(html: str) -> str:
+    m = re.search(r'name="csrf_token" value="([^"]+)"', html)
+    assert m
+    return m.group(1)
+
 
 def _get_access_token(client, oauth_client, user, scope, password="Very strong user password"):
-    login = client.post(
-        "/auth/login",
-        json={"email": user.email, "password": password},
+    page = client.get("/web/login")
+    csrf = _extract_csrf(page.text)
+    client.post(
+        "/web/login",
+        data={"csrf_token": csrf, "email": user.email, "password": password, "next": ""},
+        follow_redirects=False,
     )
-    user_token = login.json()["access_token"]
 
     resp = client.get(
         "/oauth/authorize",
@@ -23,7 +31,15 @@ def _get_access_token(client, oauth_client, user, scope, password="Very strong u
             "code_challenge": "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
             "code_challenge_method": "S256",
         },
-        headers={"Authorization": f"Bearer {user_token}"},
+        follow_redirects=False,
+    )
+    request_id = parse_qs(urlparse(resp.headers["location"]).query)["request_id"][0]
+
+    consent_page = client.get(f"/web/consent?request_id={request_id}")
+    csrf = _extract_csrf(consent_page.text)
+    resp = client.post(
+        "/web/consent",
+        data={"csrf_token": csrf, "request_id": request_id, "decision": "allow"},
         follow_redirects=False,
     )
     code = parse_qs(urlparse(resp.headers["location"]).query)["code"][0]

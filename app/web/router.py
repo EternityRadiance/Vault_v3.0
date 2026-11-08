@@ -25,6 +25,7 @@ from app.web.forms import LoginForm, RegisterForm, parse_form
 from app.web.session import create_web_session, destroy_web_session, get_web_user
 
 from app.web.admin_router import router as admin_router
+from app.web.consent_router import router as consent_router
 
 router = APIRouter(prefix="/web", tags=["web"])
 
@@ -326,3 +327,4 @@ async def account_security_submit(
     return RedirectResponse("/web/account/security", status_code=303)
 
 router.include_router(admin_router)
+router.include_router(consent_router)

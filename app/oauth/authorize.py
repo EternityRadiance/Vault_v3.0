@@ -1,9 +1,7 @@
 from __future__ import annotations
-import hashlib
+import json
 import secrets
-from datetime import datetime, timedelta, timezone
-from urllib.parse import urlencode
-
+from urllib.parse import quote, urlencode
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy import select
@@ -12,14 +10,9 @@ from sqlalchemy.orm import Session
 from app.audit.events import OAuthEvents
 from app.audit.service import get_client_info, write_event
 from app.config import settings
-from app.core.deps import get_current_user
 from app.db.session import get_db
-from app.models.auth_code import AuthCode
 from app.models.oauth_client import OAuthClient
-from app.models.user import User
-
 from app.oauth.errors import (
-    ACCESS_DENIED,
     INVALID_REQUEST,
     INVALID_SCOPE,
     UNAUTHORIZED_CLIENT,
@@ -27,14 +20,14 @@ from app.oauth.errors import (
     oauth_json_error,
     oauth_redirect_error,
 )
+from app.redis_client import get_redis
+from app.web.session import get_web_user
 
 router = APIRouter(tags=["oauth"])
 
-def _utcnow() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+CONSENT_TTL_SEC = 300
+CONSENT_KEY_PREFIX = "consent:"
 
-def _sha256_hex(value: str) -> str:
-    return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 @router.get("/oauth/authorize", include_in_schema=False)
 def authorize(
@@ -48,9 +41,19 @@ def authorize(
     code_challenge_method: str | None = Query(default=None),
     nonce: str | None = Query(default=None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     info = get_client_info(request)
+
+    web_user = get_web_user(db, request)
+    if web_user is None:
+        original_query = request.url.query
+        next_url = "/oauth/authorize"
+        if original_query:
+            next_url += "?" + original_query
+        return RedirectResponse(
+            "/web/login?next=" + quote(next_url, safe=""),
+            status_code=303,
+        )
 
     client = db.execute(
         select(OAuthClient).where(OAuthClient.client_id == client_id)
@@ -60,7 +63,7 @@ def authorize(
         write_event(
             db,
             OAuthEvents.AUTHORIZE_FAILURE,
-            actor_id=current_user.id,
+            actor_id=web_user.id,
             ip=info["ip"],
             user_agent=info["user_agent"],
             metadata={
@@ -74,7 +77,7 @@ def authorize(
         write_event(
             db,
             OAuthEvents.AUTHORIZE_FAILURE,
-            actor_id=current_user.id,
+            actor_id=web_user.id,
             client_id=client.client_id,
             ip=info["ip"],
             user_agent=info["user_agent"],
@@ -110,7 +113,7 @@ def authorize(
         write_event(
             db,
             OAuthEvents.AUTHORIZE_FAILURE,
-            actor_id=current_user.id,
+            actor_id=web_user.id,
             client_id=client.client_id,
             ip=info["ip"],
             user_agent=info["user_agent"],
@@ -136,27 +139,27 @@ def authorize(
                 "code_challenge_method must be S256",
             )
 
-    raw_code = secrets.token_urlsafe(48)
-    code_hash = _sha256_hex(raw_code)
-
-    auth_code = AuthCode(
-        code_hash=code_hash,
-        client_id=client.client_id,
-        user_id=current_user.id,
-        redirect_uri=redirect_uri,
-        scope=" ".join(requested_scopes),
-        code_challenge=code_challenge,
-        code_challenge_method=code_challenge_method,
-        nonce=nonce,
-        expires_at=_utcnow() + timedelta(seconds=settings.auth_code_ttl_sec),
+    pending_id = secrets.token_urlsafe(32)
+    payload = {
+        "client_id": client.client_id,
+        "redirect_uri": redirect_uri,
+        "scope": " ".join(requested_scopes),
+        "state": state,
+        "nonce": nonce,
+        "code_challenge": code_challenge,
+        "code_challenge_method": code_challenge_method,
+        "user_id": web_user.id,
+    }
+    get_redis().setex(
+        f"{CONSENT_KEY_PREFIX}{pending_id}",
+        CONSENT_TTL_SEC,
+        json.dumps(payload, ensure_ascii=False),
     )
-    db.add(auth_code)
-    db.commit()
 
     write_event(
         db,
         OAuthEvents.AUTHORIZE_SUCCESS,
-        actor_id=current_user.id,
+        actor_id=web_user.id,
         client_id=client.client_id,
         ip=info["ip"],
         user_agent=info["user_agent"],
@@ -165,9 +168,11 @@ def authorize(
             "scope": " ".join(requested_scopes),
             "redirect_uri": redirect_uri,
             "has_pkce": bool(code_challenge),
+            "stage": "consent_pending",
         },
     )
 
-    params = {"code": raw_code, "state": state}
-    location = f"{redirect_uri}?{urlencode(params)}"
-    return RedirectResponse(url=location, status_code=302)
+    return RedirectResponse(
+        f"/web/consent?request_id={pending_id}",
+        status_code=303,
+    )

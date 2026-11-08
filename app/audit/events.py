@@ -22,6 +22,8 @@ class OAuthEvents:
     CLIENT_ENABLED = "client.enabled"
     CLIENT_DISABLED = "client.disabled"
     SESSION_REVOKED = "session.revoked"
+    CONSENT_GRANTED = "oauth.consent.granted"
+    CONSENT_DENIED = "oauth.consent.denied"
 
 class AdminEvents:
     USER_DISABLED = "admin.user.disabled"
