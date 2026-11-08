@@ -1,0 +1,99 @@
+{% extends "admin/base.html" %}
+{% from "_macros.html" import render_pagination %}
+
+{% block title %}Аудит — {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+        <h1 style="margin:0;">Аудит</h1>
+        <a href="/web/admin" class="btn btn--secondary">← Дашборд</a>
+    </div>
+
+    <form method="get" action="/web/admin/audit"
+          style="display:grid; grid-template-columns:2fr 1fr 1fr 1fr 1fr auto; gap:0.5rem; align-items:end; margin-bottom:1rem;">
+        <label style="display:flex; flex-direction:column; font-size:0.8rem; color:var(--muted);">
+            Event type
+            <select name="event_type" style="padding:0.5rem; border:1px solid var(--border); border-radius:4px;">
+                <option value="">Все</option>
+                {% for et in event_types %}
+                    <option value="{{ et }}" {% if et == filter_event_type %}selected{% endif %}>{{ et }}</option>
+                {% endfor %}
+            </select>
+        </label>
+
+        <label style="display:flex; flex-direction:column; font-size:0.8rem; color:var(--muted);">
+            Actor ID
+            <input type="number" name="actor_id" value="{{ filter_actor_id }}"
+                   style="padding:0.5rem; border:1px solid var(--border); border-radius:4px;">
+        </label>
+
+        <label style="display:flex; flex-direction:column; font-size:0.8rem; color:var(--muted);">
+            IP
+            <input type="text" name="ip" value="{{ filter_ip }}"
+                   style="padding:0.5rem; border:1px solid var(--border); border-radius:4px;">
+        </label>
+
+        <label style="display:flex; flex-direction:column; font-size:0.8rem; color:var(--muted);">
+            С
+            <input type="date" name="date_from" value="{{ filter_date_from }}"
+                   style="padding:0.5rem; border:1px solid var(--border); border-radius:4px;">
+        </label>
+
+        <label style="display:flex; flex-direction:column; font-size:0.8rem; color:var(--muted);">
+            По
+            <input type="date" name="date_to" value="{{ filter_date_to }}"
+                   style="padding:0.5rem; border:1px solid var(--border); border-radius:4px;">
+        </label>
+
+        <div style="display:flex; gap:0.5rem;">
+            <button type="submit" class="btn btn--primary">Фильтр</button>
+            <a href="/web/admin/audit" class="btn btn--secondary">Сбросить</a>
+        </div>
+    </form>
+
+    <p style="display:flex; gap:1rem; align-items:center;">
+        <a class="btn btn--secondary"
+           href="/web/admin/audit/export.csv{% if build_qs() %}?{{ build_qs() }}{% endif %}">📥 Экспорт CSV</a>
+        <span class="text-muted">Всего: {{ total }}.</span>
+    </p>
+
+    {% if events %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Когда</th>
+                <th>Event type</th>
+                <th>Actor</th>
+                <th>Client</th>
+                <th>IP</th>
+                <th>Metadata</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for e in events %}
+            <tr>
+                <td>{{ e.created_at | datetime_format }}</td>
+                <td><code>{{ e.event_type }}</code></td>
+                <td>{{ e.actor_id if e.actor_id is not none else "—" }}</td>
+                <td>
+                    {% if e.client_id %}
+                        <code>{{ e.client_id | short_id }}</code>
+                    {% else %}—{% endif %}
+                </td>
+                <td>{{ e.ip or "—" }}</td>
+                <td>
+                    {% if e.metadata_json %}
+                        <pre style="margin:0; font-size:0.75rem; max-width:400px; overflow-x:auto;">{{ e.metadata_json | tojson }}</pre>
+                    {% else %}—{% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {{ render_pagination(page, total_pages, "/web/admin/audit", ("&" ~ build_qs()) if build_qs() else "") }}
+    {% else %}
+    <p class="text-muted">События не найдены.</p>
+    {% endif %}
+</div>
+{% endblock %}

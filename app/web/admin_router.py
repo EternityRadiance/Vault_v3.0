@@ -1,18 +1,26 @@
 from __future__ import annotations
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, Request, Form, HTTPException, Query, status
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, StreamingResponse
+from functools import lru_cache
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 from math import ceil
 
+from datetime import date as _date
+
+import csv
+import io
+import json
 import secrets
 import uuid
 
+from app.audit import events as _ev
 from app.audit.events import AdminEvents
 from app.audit.service import get_client_info, write_event
 from app.core.passwords import hash_password
 from app.db.session import get_db
+from app.models.audit_event import AuditEvent
 from app.models.oauth_client import OAuthClient
 from app.models.refresh_token import RefreshToken
 from app.models.user import User
@@ -30,6 +38,7 @@ from app.web.stats import (
 )
 
 USERS_PAGE_SIZE = 25
+AUDIT_PAGE_SIZE = 50
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
@@ -521,3 +530,173 @@ async def client_disable(
         flash(request, f"Клиент {client.name} выключен", "success")
 
     return RedirectResponse(f"/web/admin/clients/{client_pk}", status_code=303)
+
+@lru_cache(maxsize=1)
+def _all_event_types() -> tuple[str, ...]:
+    types: set[str] = set()
+    for name in dir(_ev):
+        cls = getattr(_ev, name)
+        if not isinstance(cls, type):
+            continue
+        for attr in dir(cls):
+            if not attr.isupper():
+                continue
+            val = getattr(cls, attr)
+            if isinstance(val, str):
+                types.add(val)
+    return tuple(sorted(types))
+
+def _parse_date(value: str | None, *, end_of_day: bool = False) -> datetime | None:
+    if not value:
+        return None
+    try:
+        d = _date.fromisoformat(value)
+    except ValueError:
+        return None
+    if end_of_day:
+        return datetime(d.year, d.month, d.day, 23, 59, 59)
+    return datetime(d.year, d.month, d.day, 0, 0, 0)
+
+def _audit_query(
+        db: Session,
+        *,
+        event_type: str | None,
+        actor_id: int | None,
+        ip: str | None,
+        date_from: datetime | None,
+        date_to: datetime | None,
+):
+    stmt = select(AuditEvent).order_by(AuditEvent.created_at.desc())
+    if event_type:
+        stmt = stmt.where(AuditEvent.event_type == event_type)
+    if actor_id is not None:
+        stmt = stmt.where(AuditEvent.actor_id == actor_id)
+    if ip:
+        stmt = stmt.where(AuditEvent.ip == ip)
+    if date_from is not None:
+        stmt = stmt.where(AuditEvent.created_at >= date_from)
+    if date_to is not None:
+        stmt = stmt.where(AuditEvent.created_at <= date_to)
+    return stmt
+
+def _normalize_filters(
+        event_type: str | None,
+        actor_id: str | None,
+        ip: str | None,
+        date_from: str | None,
+        date_to: str | None,
+) -> dict:
+    actor_id_int: int | None = None
+    if actor_id:
+        try:
+            actor_id_int = int(actor_id)
+        except ValueError:
+            actor_id_int = None
+
+    return {
+        "event_type": (event_type or "").strip() or None,
+        "actor_id": actor_id_int,
+        "ip": (ip or "").strip() or None,
+        "date_from": _parse_date(date_from),
+        "date_to": _parse_date(date_to, end_of_day=True),
+    }
+
+@router.get("/audit")
+def audit_list(
+    request: Request,
+    event_type: str | None = Query(default=None),
+    actor_id: str | None = Query(default=None),
+    ip: str | None = Query(default=None),
+    date_from: str | None = Query(default=None),
+    date_to: str | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_web),
+):
+    f = _normalize_filters(event_type, actor_id, ip, date_from, date_to)
+
+    base = _audit_query(db, **f)
+    total = db.execute(select(func.count()).select_from(base.subquery())).scalar_one()
+    total_pages = max(1, ceil(total / AUDIT_PAGE_SIZE))
+    page = min(page, total_pages)
+    offset = (page - 1) * AUDIT_PAGE_SIZE
+
+    events = db.execute(
+        base.offset(offset).limit(AUDIT_PAGE_SIZE)
+    ).scalars().all()
+
+    def build_qs() -> str:
+        parts: list[str] = []
+        if f["event_type"]:
+            parts.append(f"event_type={f['event_type']}")
+        if f["actor_id"] is not None:
+            parts.append(f"actor_id={f['actor_id']}")
+        if f["ip"]:
+            parts.append(f"ip={f['ip']}")
+        if date_from:
+            parts.append(f"date_from={date_from}")
+        if date_to:
+            parts.append(f"date_to={date_to}")
+        return "&".join(parts)
+
+    return render(
+        request,
+        "admin/audit.html",
+        current_user=user,
+        active="audit",
+        events=events,
+        event_types=_all_event_types(),
+        filter_event_type=f["event_type"] or "",
+        filter_actor_id=actor_id or "",
+        filter_ip=f["ip"] or "",
+        filter_date_from=date_from or "",
+        filter_date_to=date_to or "",
+        page=page,
+        total_pages=total_pages,
+        total=total,
+        build_qs=build_qs,
+    )
+
+@router.get("/audit/export.csv")
+def audit_export_csv(
+    event_type: str | None = Query(default=None),
+    actor_id: str | None = Query(default=None),
+    ip: str | None = Query(default=None),
+    date_from: str | None = Query(default=None),
+    date_to: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin_web),
+):
+    f = _normalize_filters(event_type, actor_id, ip, date_from, date_to)
+    stmt = _audit_query(db, **f)
+
+    def generate():
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(
+            ["id", "created_at", "event_type", "actor_id",
+             "client_id", "ip", "user_agent", "metadata"]
+        )
+        yield buf.getvalue()
+        buf.seek(0); buf.truncate(0)
+
+        for e in db.execute(stmt).yield_per(500).scalars():
+            writer.writerow([
+                e.id,
+                e.created_at.isoformat() if e.created_at else "",
+                e.event_type,
+                e.actor_id if e.actor_id is not None else "",
+                e.client_id or "",
+                e.ip or "",
+                e.user_agent or "",
+                json.dumps(e.metadata_json, ensure_ascii=False) if e.metadata_json else "",
+            ])
+            yield buf.getvalue()
+            buf.seek(0); buf.truncate(0)
+
+    filename = f"audit_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.csv"
+    return StreamingResponse(
+        generate(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

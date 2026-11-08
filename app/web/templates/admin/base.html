@@ -3,3 +3,16 @@
 {% block scripts %}
     <script src="/web/static/js/admin.js"></script>
 {% endblock %}
+
+{% block subheader %}
+<div class="container" style="margin-bottom:1rem;">
+    <div class="card" style="padding:0.5rem 1rem;">
+        <nav style="display:flex; gap:1.5rem; font-size:0.9rem; flex-wrap:wrap;">
+            <a href="/web/admin" {% if active == "dashboard" %}style="font-weight:600; color:var(--primary);"{% endif %}>Дашборд</a>
+            <a href="/web/admin/users" {% if active == "users" %}style="font-weight:600; color:var(--primary);"{% endif %}>Пользователи</a>
+            <a href="/web/admin/clients" {% if active == "clients" %}style="font-weight:600; color:var(--primary);"{% endif %}>Клиенты</a>
+            <a href="/web/admin/audit" {% if active == "audit" %}style="font-weight:600; color:var(--primary);"{% endif %}>Аудит</a>
+        </nav>
+    </div>
+</div>
+{% endblock %}
